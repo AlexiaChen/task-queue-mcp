@@ -118,7 +118,7 @@ Copilot CLI supports MCP servers via `~/.copilot/mcp-config.json`.
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "task-queue": {
       "type": "stdio",
       "command": "/path/to/task-queue-mcp",
@@ -134,7 +134,7 @@ Copilot CLI supports MCP servers via `~/.copilot/mcp-config.json`.
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "task-queue": {
       "type": "sse",
       "url": "http://localhost:9292/sse",
