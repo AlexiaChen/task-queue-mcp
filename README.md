@@ -216,6 +216,26 @@ Tasks have three states:
 
 Open http://localhost:9292 in your browser to access the Web UI for managing queues and tasks visually.
 
+## AI Agent Instructions
+
+The `instructions/` directory contains ready-to-use instructions for AI agents to process tasks from queues automatically.
+
+| File | Description |
+|------|-------------|
+| `CLAUDE.md` | Instruction for Claude Code / Claude Desktop |
+| `AGENTS.md` | Instruction for other AI agents (GitHub Copilot, Gemini, etc.) |
+
+### Usage
+
+Copy the content of `CLAUDE.md` or `AGENTS.md` into your project's instruction file (e.g., `.claude/CLAUDE.md` or `AGENTS.md`). When you ask the AI to "process all tasks in queue X", it will:
+
+1. Find the queue by name
+2. Loop through pending tasks (sorted by priority, then position)
+3. For each task: mark as "doing" → execute the work → mark as "finished"
+4. Stop when all tasks are completed
+
+This enables autonomous task processing where the AI acts as a worker for your task queues.
+
 ## Project Structure
 
 ```
@@ -236,6 +256,9 @@ internal/
 examples/
 ├── mcp-client/main.go      # SSE client example
 └── stdio-client/main.go    # STDIO client example
+instructions/
+├── CLAUDE.md               # Claude Code task processing instruction
+└── AGENTS.md               # Generic AI agent task processing instruction
 ```
 
 ## Configuration
