@@ -80,7 +80,7 @@ jobs:
 
       - name: Run e2e tests
         run: |
-          ./bin/task-queue-mcp -port=9292 -db=./data/test.db -mcp=http &
+          ./bin/task-queue-mcp -db=./data/test.db &
           sleep 2
           E2E_SERVER_URL=http://localhost:9292 go test -v ./test/e2e/
           pkill -f task-queue-mcp || true
@@ -132,7 +132,7 @@ jobs:
 
       - name: Run HTTP example
         run: |
-          ./bin/task-queue-mcp -port=9292 -db=./data/example.db -mcp=http &
+          ./bin/task-queue-mcp -db=./data/example.db &
           sleep 2
           timeout 60 go run ./examples/mcp-client/main.go
           pkill -f task-queue-mcp || true

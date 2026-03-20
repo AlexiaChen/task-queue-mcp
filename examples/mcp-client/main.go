@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/client/transport"
 	"github.com/mark3labs/mcp-go/mcp"
 )
 
@@ -36,9 +37,18 @@ func main() {
 	fmt.Println("=== MCP Client Example (SSE Transport) ===")
 	fmt.Printf("Connecting to MCP server at %s...\n", serverURL)
 
-	c, err := client.NewSSEMCPClient(serverURL)
+	// Create SSE transport
+	sseTransport, err := transport.NewSSE(serverURL)
 	if err != nil {
-		log.Fatalf("Failed to create SSE client: %v", err)
+		log.Fatalf("Failed to create SSE transport: %v", err)
+	}
+
+	// Create client with the transport
+	c := client.NewClient(sseTransport)
+
+	// Start the client connection
+	if err := c.Start(ctx); err != nil {
+		log.Fatalf("Failed to start client: %v", err)
 	}
 	defer c.Close()
 
