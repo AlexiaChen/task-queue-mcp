@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Queue Manager</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📋 Task Queue Manager</h1>
+            <button id="refresh-btn" class="btn btn-secondary">Refresh</button>
+        </header>
+
+        <main>
+            <!-- Queue List Section -->
+            <section id="queues-section">
+                <div class="section-header">
+                    <h2>Queues</h2>
+                    <button id="add-queue-btn" class="btn btn-primary">+ New Queue</button>
+                </div>
+                <div id="queues-list" class="queues-grid"></div>
+            </section>
+
+            <!-- Queue Detail Section (hidden by default) -->
+            <section id="queue-detail-section" class="hidden">
+                <div class="section-header">
+                    <button id="back-btn" class="btn btn-secondary">← Back</button>
+                    <h2 id="queue-title"></h2>
+                    <div class="queue-actions">
+                        <button id="add-task-btn" class="btn btn-primary">+ New Task</button>
+                        <button id="delete-queue-btn" class="btn btn-danger">Delete Queue</button>
+                    </div>
+                </div>
+                <div id="queue-stats" class="stats-bar"></div>
+                <div id="tasks-list" class="tasks-list"></div>
+            </section>
+        </main>
+
+        <!-- Modal for Create/Edit -->
+        <div id="modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="modal-title"></h3>
+                    <button class="modal-close">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="modal-form"></form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary modal-cancel">Cancel</button>
+                    <button type="submit" form="modal-form" class="btn btn-primary" id="modal-submit">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
