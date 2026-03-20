@@ -5,7 +5,7 @@ A Go-based MCP (Model Context Protocol) Server that manages multiple Task Queues
 ## Project Overview
 
 This is an MCP server implementation in Go that provides:
-- **MCP Tools**: 8 tools for queue and task management (list, create, update, delete)
+- **MCP Tools**: 3 readonly tools + 5 admin tools for queue and task management
 - **MCP Resources**: 4 resources for reading queue/task data
 - **REST API**: Full CRUD API for queues and tasks
 - **Web UI**: Embedded single-page application for visual management
@@ -48,14 +48,21 @@ internal/
 
 ## MCP Tools
 
+### Readonly Mode (Default - for AI Agents)
+
 | Tool | Description |
 |------|-------------|
 | `queue_list` | List all queues with stats |
+| `task_list` | List tasks in a queue |
+| `task_update` | Update task status |
+
+### Admin Tools (require `-readonly=false`)
+
+| Tool | Description |
+|------|-------------|
 | `queue_create` | Create a new queue |
 | `queue_delete` | Delete a queue |
-| `task_list` | List tasks in a queue |
 | `task_create` | Create a new task |
-| `task_update` | Update task status |
 | `task_delete` | Delete a task |
 | `task_prioritize` | Move task to front (插队) |
 
@@ -78,15 +85,20 @@ Tasks have three states:
 ## Running Modes
 
 ```bash
-# HTTP mode (Web UI + REST API + MCP SSE)
+# HTTP mode (Web UI + REST API + MCP SSE) - readonly by default
 ./bin/task-queue-mcp -port=9292 -mcp=http
 
-# STDIO mode (for MCP clients like Claude)
+# STDIO mode (for MCP clients like Claude) - readonly by default
 ./bin/task-queue-mcp -mcp=stdio
 
 # Both modes
 ./bin/task-queue-mcp -port=9292 -mcp=both
+
+# Admin mode (full access to all MCP tools)
+./bin/task-queue-mcp -readonly=false
 ```
+
+> **Note**: Readonly mode is enabled by default for AI safety. Use `-readonly=false` or `MCP_READONLY=false` for admin access.
 
 ## Environment Variables
 
@@ -95,6 +107,7 @@ Tasks have three states:
 | `PORT` | `9292` | HTTP server port |
 | `DB_PATH` | `./data/tasks.db` | SQLite database path |
 | `MCP_MODE` | `http` | MCP mode: stdio, http, or both |
+| `MCP_READONLY` | `true` | Set to `false` to expose all MCP tools |
 
 ## Testing
 

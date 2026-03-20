@@ -25,6 +25,12 @@ func main() {
 	httpPort := flag.Int("port", 9292, "HTTP server port")
 	dbPath := flag.String("db", "./data/tasks.db", "SQLite database path")
 	mcpMode := flag.String("mcp", "http", "MCP mode: stdio, http, or both")
+	// Parse readonly mode: default true for AI safety, can be disabled via -readonly=false or MCP_READONLY=false
+	defaultReadonly := true
+	if envVal := os.Getenv("MCP_READONLY"); envVal == "false" {
+		defaultReadonly = false
+	}
+	readonly := flag.Bool("readonly", defaultReadonly, "Expose only read/update MCP tools (default: true for AI safety)")
 	flag.Parse()
 
 	// Initialize storage
@@ -38,7 +44,7 @@ func main() {
 	manager := queue.NewManager(store)
 
 	// Create MCP server
-	mcpServer, err := mcplib.NewServer(manager)
+	mcpServer, err := mcplib.NewServer(manager, mcplib.WithReadonlyMode(*readonly))
 	if err != nil {
 		log.Fatalf("Failed to create MCP server: %v", err)
 	}
@@ -47,6 +53,9 @@ func main() {
 	if *mcpMode == "stdio" {
 		// STDIO-only mode for MCP clients
 		log.Println("Starting MCP server in STDIO mode...")
+		if *readonly {
+			log.Println("Readonly mode enabled - only queue_list, task_list, task_update tools exposed")
+		}
 		if err := server.ServeStdio(mcpServer.GetMCPServer()); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
@@ -110,6 +119,9 @@ func main() {
 		log.Printf("Starting HTTP server on %s", httpAddr)
 		log.Printf("Web UI: http://localhost%s", httpAddr)
 		log.Printf("MCP SSE: http://localhost%s/sse", httpAddr)
+		if *readonly {
+			log.Println("Readonly mode enabled - only queue_list, task_list, task_update tools exposed")
+		}
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}

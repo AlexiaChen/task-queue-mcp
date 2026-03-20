@@ -6,6 +6,8 @@ This instruction configures an AI agent to autonomously process tasks from a spe
 
 ### STDIO Mode (Local)
 
+The server defaults to readonly mode (safe for AI agents):
+
 ```json
 {
   "servers": {
@@ -32,6 +34,8 @@ This instruction configures an AI agent to autonomously process tasks from a spe
   }
 }
 ```
+
+> **Note**: Readonly mode is enabled by default. To disable for admin access, use `-readonly=false` flag or set `MCP_READONLY=false` environment variable.
 
 ## Agent Behavior
 
@@ -106,18 +110,17 @@ Example: Task A (priority=10, position=2) runs before Task B (priority=5, positi
   2. Stop processing immediately
   3. Do not attempt to retry automatically
 
-## Available MCP Tools
+## Available MCP Tools (Readonly Mode)
+
+The following tools are available to AI agents in readonly mode:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `queue_list` | List all queues | (none) |
-| `queue_create` | Create a new queue | `name`, `description?` |
-| `queue_delete` | Delete a queue | `id` |
 | `task_list` | List tasks in queue | `queue_id`, `status?` |
-| `task_create` | Create a new task | `queue_id`, `title`, `description?`, `priority?` |
 | `task_update` | Update task status | `task_id`, `status` |
-| `task_delete` | Delete a task | `task_id` |
-| `task_prioritize` | Move task to front | `task_id`, `position?` |
+
+> **Admin Tools**: `queue_create`, `queue_delete`, `task_create`, `task_delete`, `task_prioritize` are only available when readonly mode is disabled (`-readonly=false`). Use the Web UI or REST API for queue/task management.
 
 ## Task Status Values
 

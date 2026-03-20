@@ -11,31 +11,34 @@ import (
 
 // registerTools registers all MCP tools
 func (s *Server) registerTools() error {
-	// Queue tools
+	// Always register read tools
 	s.mcp.AddTool(mcplib.NewTool("queue_list",
 		mcplib.WithDescription("List all task queues with their statistics"),
 	), s.handleQueueList)
 
-	s.mcp.AddTool(mcplib.NewTool("queue_create",
-		mcplib.WithDescription("Create a new task queue"),
-		mcplib.WithString("name",
-			mcplib.Required(),
-			mcplib.Description("Unique name for the queue"),
-		),
-		mcplib.WithString("description",
-			mcplib.Description("Optional description for the queue"),
-		),
-	), s.handleQueueCreate)
+	// Admin-only tools (not exposed in readonly mode)
+	if !s.readonly {
+		s.mcp.AddTool(mcplib.NewTool("queue_create",
+			mcplib.WithDescription("Create a new task queue"),
+			mcplib.WithString("name",
+				mcplib.Required(),
+				mcplib.Description("Unique name for the queue"),
+			),
+			mcplib.WithString("description",
+				mcplib.Description("Optional description for the queue"),
+			),
+		), s.handleQueueCreate)
 
-	s.mcp.AddTool(mcplib.NewTool("queue_delete",
-		mcplib.WithDescription("Delete a task queue and all its tasks"),
-		mcplib.WithNumber("queue_id",
-			mcplib.Required(),
-			mcplib.Description("ID of the queue to delete"),
-		),
-	), s.handleQueueDelete)
+		s.mcp.AddTool(mcplib.NewTool("queue_delete",
+			mcplib.WithDescription("Delete a task queue and all its tasks"),
+			mcplib.WithNumber("queue_id",
+				mcplib.Required(),
+				mcplib.Description("ID of the queue to delete"),
+			),
+		), s.handleQueueDelete)
+	}
 
-	// Task tools
+	// Always register task list (read)
 	s.mcp.AddTool(mcplib.NewTool("task_list",
 		mcplib.WithDescription("List tasks in a queue"),
 		mcplib.WithNumber("queue_id",
@@ -48,25 +51,49 @@ func (s *Server) registerTools() error {
 		),
 	), s.handleTaskList)
 
-	s.mcp.AddTool(mcplib.NewTool("task_create",
-		mcplib.WithDescription("Create a new task in a queue"),
-		mcplib.WithNumber("queue_id",
-			mcplib.Required(),
-			mcplib.Description("ID of the queue to add task to"),
-		),
-		mcplib.WithString("title",
-			mcplib.Required(),
-			mcplib.Description("Title of the task"),
-		),
-		mcplib.WithString("description",
-			mcplib.Description("Optional description of the task"),
-		),
-		mcplib.WithNumber("priority",
-			mcplib.Description("Priority level (higher = more urgent)"),
-			mcplib.DefaultNumber(0),
-		),
-	), s.handleTaskCreate)
+	// Admin-only tools (not exposed in readonly mode)
+	if !s.readonly {
+		s.mcp.AddTool(mcplib.NewTool("task_create",
+			mcplib.WithDescription("Create a new task in a queue"),
+			mcplib.WithNumber("queue_id",
+				mcplib.Required(),
+				mcplib.Description("ID of the queue to add task to"),
+			),
+			mcplib.WithString("title",
+				mcplib.Required(),
+				mcplib.Description("Title of the task"),
+			),
+			mcplib.WithString("description",
+				mcplib.Description("Optional description of the task"),
+			),
+			mcplib.WithNumber("priority",
+				mcplib.Description("Priority level (higher = more urgent)"),
+				mcplib.DefaultNumber(0),
+			),
+		), s.handleTaskCreate)
 
+		s.mcp.AddTool(mcplib.NewTool("task_delete",
+			mcplib.WithDescription("Delete a task"),
+			mcplib.WithNumber("task_id",
+				mcplib.Required(),
+				mcplib.Description("ID of the task to delete"),
+			),
+		), s.handleTaskDelete)
+
+		s.mcp.AddTool(mcplib.NewTool("task_prioritize",
+			mcplib.WithDescription("Move a task to a higher priority position in the queue (插队)"),
+			mcplib.WithNumber("task_id",
+				mcplib.Required(),
+				mcplib.Description("ID of the task to prioritize"),
+			),
+			mcplib.WithNumber("position",
+				mcplib.Description("Target position (1 = front of queue). If not specified, moves to front."),
+				mcplib.DefaultNumber(1),
+			),
+		), s.handleTaskPrioritize)
+	}
+
+	// Always allow status update (AI can process tasks)
 	s.mcp.AddTool(mcplib.NewTool("task_update",
 		mcplib.WithDescription("Update a task's status"),
 		mcplib.WithNumber("task_id",
@@ -79,26 +106,6 @@ func (s *Server) registerTools() error {
 			mcplib.Enum("pending", "doing", "finished"),
 		),
 	), s.handleTaskUpdate)
-
-	s.mcp.AddTool(mcplib.NewTool("task_delete",
-		mcplib.WithDescription("Delete a task"),
-		mcplib.WithNumber("task_id",
-			mcplib.Required(),
-			mcplib.Description("ID of the task to delete"),
-		),
-	), s.handleTaskDelete)
-
-	s.mcp.AddTool(mcplib.NewTool("task_prioritize",
-		mcplib.WithDescription("Move a task to a higher priority position in the queue (插队)"),
-		mcplib.WithNumber("task_id",
-			mcplib.Required(),
-			mcplib.Description("ID of the task to prioritize"),
-		),
-		mcplib.WithNumber("position",
-			mcplib.Description("Target position (1 = front of queue). If not specified, moves to front."),
-			mcplib.DefaultNumber(1),
-		),
-	), s.handleTaskPrioritize)
 
 	return nil
 }
