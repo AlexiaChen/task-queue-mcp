@@ -1,5 +1,10 @@
 # Task Queue MCP Server
 
+[![CI](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/ci.yml)
+[![CD](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/cd.yml/badge.svg)](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/cd.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AlexiaChen/task-queue-mcp)](https://goreportcard.com/report/github.com/AlexiaChen/task-queue-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Go-based MCP (Model Context Protocol) Server that manages multiple Task Queues with Web UI and REST API.
 
 ## Features
