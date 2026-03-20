@@ -97,7 +97,7 @@ func main() {
 	// Start SSE server for MCP over HTTP
 	sseServer := server.NewSSEServer(mcpServer.GetMCPServer())
 	mux.Handle("GET /sse", sseServer)
-	mux.Handle("POST /sse", sseServer)
+	mux.Handle("POST /message", sseServer)
 
 	// Start HTTP server
 	httpAddr := fmt.Sprintf(":%d", *httpPort)
