@@ -68,15 +68,17 @@ When the loop exits (no more pending tasks in the current queue), **do NOT immed
 
 ```
 ask_user(
-  question = "队列 '{queue_name}' 的所有任务已处理完毕。是否需要继续处理其他队列？",
+  question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？",
   choices  = [
-    "继续处理其他队列",
+    "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
+    "切换到其他队列",
     "不，已完成，输出最终报告"
   ]
 )
 ```
 
-- If user selects **"继续处理其他队列"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
+- If user selects **"继续处理当前队列"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
+- If user selects **"切换到其他队列"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
 - If user selects **"不，已完成"**: proceed to Step 4.
 
 ### Step 4: Completion
@@ -106,8 +108,8 @@ Expected behavior:
 3. Mark as "doing", do the code review work
 4. Mark as "finished"
 5. Repeat until no pending tasks remain
-6. **Ask user** (via `ask_user` tool): "是否继续处理其他队列？"
-7. If user says yes → pick new queue and repeat; if no → output final report
+6. **Ask user** (via `ask_user` tool): "队列 'code-review' (id=N) 的所有任务已处理完毕。是否需要继续处理当前队列？"
+7. If user says "继续当前队列" → re-check same queue; if "切换队列" → pick new queue; if no → output final report
 
 ## MCP Tools Reference
 

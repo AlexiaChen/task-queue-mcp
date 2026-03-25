@@ -124,13 +124,17 @@ After the task processing loop exits (no more pending tasks), the agent MUST int
 
 ```
 PRESENT interactive selection to user:
-    question = "队列 '{queue_name}' 的所有任务已处理完毕。是否需要继续处理其他任务？"
+    question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？"
     choices  = [
-        "继续处理其他队列（再次调用 queue_list 选择队列）",
+        "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
+        "切换到其他队列（再次调用 queue_list 选择队列）",
         "不，已完成，输出最终报告"
     ]
 
-IF user selects "继续处理其他队列":
+IF user selects "继续处理当前队列":
+    GOTO Task Processing Loop (re-check same queue_id for new pending tasks)
+
+IF user selects "切换到其他队列":
     queue_list()  # Show all queues for user to pick next queue
     GOTO Initialization Phase with new queue_name
 
@@ -142,9 +146,10 @@ IF user selects "不，已完成":
 
 ```
 ask_user(
-  question = "队列 '{queue_name}' 的所有任务已处理完毕。是否需要继续处理其他队列？",
+  question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？",
   choices  = [
-    "继续处理其他队列",
+    "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
+    "切换到其他队列",
     "不，已完成，输出最终报告"
   ]
 )
@@ -153,7 +158,7 @@ ask_user(
 **Key requirements**:
 - This prompt MUST appear after every queue is fully drained, before the final report
 - The agent must NOT silently exit — always pause and wait for user input
-- If the user selects to continue, restart the full Initialization → Loop → Interactive Continuation cycle for the new queue
+- "继续当前队列" is the default option because new tasks may have been added while the agent was working
 
 ### 5. Completion Report
 
