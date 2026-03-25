@@ -37,6 +37,18 @@ The server defaults to readonly mode (safe for AI agents):
 
 > **Note**: Readonly mode is enabled by default. To disable for admin access, use `-readonly=false` flag or set `MCP_READONLY=false` environment variable.
 
+## Available Interfaces
+
+This project ships three binaries:
+
+| Binary | Purpose |
+|--------|---------|
+| `task-queue-mcp` | MCP server + REST API + Web UI |
+| `task-queue-tui` | Terminal UI (bubbletea) — `--server http://...` |
+| `task-queue-cli` | CLI (cobra) — `--server http://...` |
+
+Build all: `make build-all`
+
 ## Agent Behavior
 
 When instructed to process a task queue, the agent MUST:

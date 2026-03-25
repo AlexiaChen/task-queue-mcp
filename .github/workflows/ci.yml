@@ -23,14 +23,17 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Build binary
-        run: CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-mcp ./cmd/server
+      - name: Build all binaries
+        run: |
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-mcp ./cmd/server
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-tui ./cmd/tui
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-cli ./cmd/cli
 
-      - name: Upload binary artifact
+      - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: task-queue-mcp-linux
-          path: bin/task-queue-mcp
+          name: task-queue-binaries-linux
+          path: bin/
           retention-days: 7
 
   unit-test:
@@ -50,7 +53,7 @@ jobs:
         run: go mod download
 
       - name: Run unit tests
-        run: go test -v -race -coverprofile=coverage.out ./internal/...
+        run: go test -v -race -coverprofile=coverage.out ./internal/... ./cmd/cli/...
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4

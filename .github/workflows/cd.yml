@@ -83,16 +83,27 @@ jobs:
       - name: Build binaries
         run: |
           mkdir -p release
-          # Linux amd64
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o release/task-queue-mcp-linux-amd64 ./cmd/server
-          # Linux arm64
-          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o release/task-queue-mcp-linux-arm64 ./cmd/server
-          # macOS amd64
-          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o release/task-queue-mcp-darwin-amd64 ./cmd/server
-          # macOS arm64
-          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o release/task-queue-mcp-darwin-arm64 ./cmd/server
-          # Windows
-          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o release/task-queue-mcp-windows-amd64.exe ./cmd/server
+          # Define build targets: OS/ARCH
+          declare -A targets=(
+            ["linux-amd64"]="linux amd64"
+            ["linux-arm64"]="linux arm64"
+            ["darwin-amd64"]="darwin amd64"
+            ["darwin-arm64"]="darwin arm64"
+            ["windows-amd64"]="windows amd64"
+          )
+          for target in "${!targets[@]}"; do
+            read -r os arch <<< "${targets[$target]}"
+            ext=""
+            [ "$os" = "windows" ] && ext=".exe"
+            echo "Building $target..."
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
+              -o "release/task-queue-mcp-${target}${ext}" ./cmd/server
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
+              -o "release/task-queue-tui-${target}${ext}" ./cmd/tui
+            CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
+              -o "release/task-queue-cli-${target}${ext}" ./cmd/cli
+          done
+          ls -lh release/
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

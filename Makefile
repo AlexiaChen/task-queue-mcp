@@ -21,12 +21,29 @@ PORT?=9292
 DB_PATH?=./data/tasks.db
 MCP_MODE?=http
 
-## build: Build the binary
+## build: Build the server binary
 build:
-	@echo "Building..."
+	@echo "Building server..."
 	@mkdir -p bin
 	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o $(BINARY_PATH) $(MAIN_PACKAGE)
-	@echo "Binary built at $(BINARY_PATH)"
+	@echo "Server binary built at $(BINARY_PATH)"
+
+## build-tui: Build the TUI binary
+build-tui:
+	@echo "Building TUI..."
+	@mkdir -p bin
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/task-queue-tui ./cmd/tui
+	@echo "TUI binary built at ./bin/task-queue-tui"
+
+## build-cli: Build the CLI binary
+build-cli:
+	@echo "Building CLI..."
+	@mkdir -p bin
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/task-queue-cli ./cmd/cli
+	@echo "CLI binary built at ./bin/task-queue-cli"
+
+## build-all: Build all binaries (server, TUI, CLI)
+build-all: build build-tui build-cli
 
 ## build-static: Build fully static binary (no dynamic dependencies)
 build-static:

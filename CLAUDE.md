@@ -14,8 +14,17 @@ This is an MCP server implementation in Go that provides:
 ## Quick Start
 
 ```bash
-# Build
+# Build server only
 make build
+
+# Build TUI
+make build-tui
+
+# Build CLI
+make build-cli
+
+# Build all (server + TUI + CLI)
+make build-all
 
 # Run server (default port 9292)
 make run
@@ -30,9 +39,12 @@ make e2e
 ## Architecture
 
 ```
-cmd/server/main.go          # Entry point
+cmd/server/main.go          # MCP + HTTP server entry point
+cmd/tui/main.go             # TUI entry point (--server flag)
+cmd/cli/main.go             # CLI entry point (--server flag)
 internal/
 ├── api/handlers.go         # REST API handlers
+├── apiclient/client.go     # Shared REST API client (used by TUI & CLI)
 ├── mcp/                    # MCP server implementation
 │   ├── server.go           # MCP server setup
 │   ├── tools.go            # 8 MCP tools
@@ -42,6 +54,9 @@ internal/
 │   ├── models.go           # Data models
 │   └── mock_storage.go     # Mock storage for testing
 ├── storage/sqlite.go       # SQLite persistence
+├── tui/                    # TUI implementation (bubbletea)
+│   ├── app.go              # Main bubbletea model
+│   └── styles.go           # Lipgloss styles
 └── web/                    # Web UI (embedded)
     └── static/
 ```
@@ -81,6 +96,56 @@ Tasks have three states:
 - `pending` - Waiting to be processed
 - `doing` - Currently being processed
 - `finished` - Completed
+
+## TUI (Terminal UI)
+
+A bubbletea-based terminal UI that mirrors the Web UI functionality.
+
+```bash
+# Start TUI (server must be running)
+./bin/task-queue-tui --server http://localhost:9292
+
+# Build TUI
+make build-tui
+```
+
+**Key bindings:**
+| Key | Action |
+|-----|--------|
+| `j`/`k` or `↑`/`↓` | Navigate list |
+| `Enter` | Open queue |
+| `n` | New queue / task |
+| `d` | Delete selected |
+| `s` | Start task (pending → doing) |
+| `f` | Finish task (doing → finished) |
+| `r` | Reset task (finished → pending) |
+| `p` | Prioritize task (move to front) |
+| `R` | Manual refresh |
+| `Esc` / `q` | Back / quit |
+
+## CLI
+
+A cobra-based command-line interface for scripting and automation.
+
+```bash
+# Build CLI
+make build-cli
+
+# Usage
+./bin/task-queue-cli --server http://localhost:9292 queues list
+./bin/task-queue-cli queues create --name "my-queue" --desc "description"
+./bin/task-queue-cli queues delete <id>
+./bin/task-queue-cli queues stats <id>
+
+./bin/task-queue-cli tasks list <queue-id> [--status pending|doing|finished]
+./bin/task-queue-cli tasks get <id>
+./bin/task-queue-cli tasks create <queue-id> --title "task" [--desc "..."] [--priority 0]
+./bin/task-queue-cli tasks start <id>
+./bin/task-queue-cli tasks finish <id>
+./bin/task-queue-cli tasks reset <id>
+./bin/task-queue-cli tasks delete <id> [--yes]
+./bin/task-queue-cli tasks prioritize <id>
+```
 
 ## Running Modes
 
