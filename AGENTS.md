@@ -102,6 +102,18 @@ IF user selects "不，已完成":
     CONTINUE to Completion Report
 ```
 
+**For Claude Code / Copilot CLI agents**, use the `ask_user` tool:
+
+```
+ask_user(
+  question = "队列 '{queue_name}' 的所有任务已处理完毕。是否需要继续处理其他队列？",
+  choices  = [
+    "继续处理其他队列",
+    "不，已完成，输出最终报告"
+  ]
+)
+```
+
 **Key requirements**:
 - This prompt MUST appear after every queue is fully drained, before the final report
 - The agent must NOT silently exit — always pause and wait for user input
@@ -110,8 +122,8 @@ IF user selects "不，已完成":
 ### 5. Completion Report
 
 After the user confirms they are done (or selects to stop), provide:
-- Number of tasks processed
-- List of completed tasks with brief summaries
+- Number of tasks processed (across all queues in this session)
+- List of completed tasks with brief summaries per queue
 - Any errors or warnings encountered
 
 ## Ordering Rules

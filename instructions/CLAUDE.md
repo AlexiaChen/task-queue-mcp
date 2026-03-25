@@ -62,11 +62,28 @@ Repeat until all tasks are finished:
 
 7. **Loop back** to step 2
 
-### Step 3: Completion
+### Step 3: Interactive Continuation
 
-When the loop exits (no more pending tasks), report:
-- Total tasks processed
-- Summary of work completed
+When the loop exits (no more pending tasks in the current queue), **do NOT immediately print the completion report**. Instead, use the `ask_user` tool to present an interactive selection:
+
+```
+ask_user(
+  question = "队列 '{queue_name}' 的所有任务已处理完毕。是否需要继续处理其他队列？",
+  choices  = [
+    "继续处理其他队列",
+    "不，已完成，输出最终报告"
+  ]
+)
+```
+
+- If user selects **"继续处理其他队列"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
+- If user selects **"不，已完成"**: proceed to Step 4.
+
+### Step 4: Completion
+
+When the user confirms they are done, report:
+- Total tasks processed (across all queues in this session)
+- Summary of work completed per queue
 
 ## Important Rules
 
@@ -76,6 +93,7 @@ When the loop exits (no more pending tasks), report:
 4. **Always update status** - Mark tasks as "doing" before work, "finished" after
 5. **Handle errors gracefully** - If a task fails, report the error but continue with the next task
 6. **Never skip tasks** - Process all pending tasks until the queue is empty
+7. **Interactive continuation** - After a queue is fully drained, always use `ask_user` to prompt before exiting; never terminate silently
 
 ## Example Usage
 
@@ -88,6 +106,8 @@ Expected behavior:
 3. Mark as "doing", do the code review work
 4. Mark as "finished"
 5. Repeat until no pending tasks remain
+6. **Ask user** (via `ask_user` tool): "是否继续处理其他队列？"
+7. If user says yes → pick new queue and repeat; if no → output final report
 
 ## MCP Tools Reference
 
