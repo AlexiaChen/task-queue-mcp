@@ -105,6 +105,12 @@ func (m *Manager) UpdateTask(ctx context.Context, id int64, input UpdateTaskInpu
 
 // EditTask updates the content (title, description, priority) of a pending task.
 func (m *Manager) EditTask(ctx context.Context, id int64, input EditTaskInput) (*Task, error) {
+	if input.Title != nil && *input.Title == "" {
+		return nil, errors.New("task title cannot be empty")
+	}
+	if input.Priority != nil && *input.Priority < 0 {
+		return nil, errors.New("task priority cannot be negative")
+	}
 	task, err := m.storage.GetTask(ctx, id)
 	if err != nil {
 		return nil, err
