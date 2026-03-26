@@ -79,7 +79,7 @@ internal/
 | `queue_delete` | Delete a queue |
 | `task_create` | Create a new task |
 | `task_delete` | Delete a task |
-| `task_prioritize` | Move task to front (插队) |
+| `task_prioritize` | Move task to front (jump queue) |
 
 ## MCP Resources
 
@@ -219,7 +219,7 @@ make build  # Uses CGO_ENABLED=0
 - `PATCH /api/tasks/{id}` - Update task **status** (pending/doing/finished) — used by MCP
 - `PUT /api/tasks/{id}` - Edit task content (title/description/priority, pending only)
 - `DELETE /api/tasks/{id}` - Delete task
-- `POST /api/tasks/{id}/prioritize` - Prioritize task (插队)
+- `POST /api/tasks/{id}/prioritize` - Prioritize task (jump queue)
 
 ## Key Dependencies
 
@@ -287,18 +287,18 @@ When the loop exits (no more pending tasks in the current queue), **do NOT immed
 
 ```
 ask_user(
-  question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？",
+  question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
   choices  = [
-    "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
-    "切换到其他队列",
-    "不，已完成，输出最终报告"
+    "Continue current queue (re-check for newly added pending tasks)",
+    "Switch to another queue",
+    "No, done — print final report"
   ]
 )
 ```
 
-- If user selects **"继续处理当前队列"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
-- If user selects **"切换到其他队列"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
-- If user selects **"不，已完成"**: proceed to Step 4.
+- If user selects **"Continue current queue"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
+- If user selects **"Switch to another queue"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
+- If user selects **"No, done"**: proceed to Step 4.
 
 ### Step 4: Completion
 

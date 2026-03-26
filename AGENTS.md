@@ -124,21 +124,21 @@ After the task processing loop exits (no more pending tasks), the agent MUST int
 
 ```
 PRESENT interactive selection to user:
-    question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？"
+    question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?"
     choices  = [
-        "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
-        "切换到其他队列（再次调用 queue_list 选择队列）",
-        "不，已完成，输出最终报告"
+        "Continue current queue (re-check for newly added pending tasks)",
+        "Switch to another queue (call queue_list to select a new queue)",
+        "No, done — print final report"
     ]
 
-IF user selects "继续处理当前队列":
+IF user selects "Continue current queue":
     GOTO Task Processing Loop (re-check same queue_id for new pending tasks)
 
-IF user selects "切换到其他队列":
+IF user selects "Switch to another queue":
     queue_list()  # Show all queues for user to pick next queue
     GOTO Initialization Phase with new queue_name
 
-IF user selects "不，已完成":
+IF user selects "No, done":
     CONTINUE to Completion Report
 ```
 
@@ -146,11 +146,11 @@ IF user selects "不，已完成":
 
 ```
 ask_user(
-  question = "队列 '{queue_name}' (id={queue_id}) 的所有任务已处理完毕。是否需要继续处理当前队列？",
+  question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
   choices  = [
-    "继续处理当前队列（重新检查是否有新的 Pending 任务加入）",
-    "切换到其他队列",
-    "不，已完成，输出最终报告"
+    "Continue current queue (re-check for newly added pending tasks)",
+    "Switch to another queue",
+    "No, done — print final report"
   ]
 )
 ```
@@ -158,7 +158,7 @@ ask_user(
 **Key requirements**:
 - This prompt MUST appear after every queue is fully drained, before the final report
 - The agent must NOT silently exit — always pause and wait for user input
-- "继续当前队列" is the default option because new tasks may have been added while the agent was working
+- "Continue current queue" is the default option because new tasks may have been added while the agent was working
 
 ### 5. Completion Report
 
@@ -237,11 +237,11 @@ Processing task #17: "Run tests" (priority: 5)
 No more pending tasks.
 
 [Interactive prompt]
-队列 "daily-tasks" 的所有任务已处理完毕。是否需要继续处理其他任务？
-> 1. 继续处理其他队列（再次调用 queue_list 选择队列）
-> 2. 不，已完成，输出最终报告
+Queue "daily-tasks" fully processed. Continue with the current queue?
+> 1. Continue with another queue (call queue_list to select a new queue)
+> 2. No, done — print final report
 
-[User selects: 不，已完成]
+[User selects: No, done]
 
 Summary:
 - Processed: 3 tasks
