@@ -27,7 +27,7 @@ var mockQueue = apiclient.QueueWithStats{
 
 var mockTask = queue.Task{
 	ID:          10,
-	QueueID:     1,
+	ProjectID:   1,
 	Title:       "Test Task",
 	Description: "A test task",
 	Status:      queue.StatusPending,
@@ -200,7 +200,7 @@ func TestTasksCreate(t *testing.T) {
 		if r.Method == http.MethodPost && r.URL.Path == "/api/issues" {
 			var input queue.CreateTaskInput
 			json.NewDecoder(r.Body).Decode(&input)
-			t := queue.Task{ID: 42, QueueID: input.QueueID, Title: input.Title, Status: queue.StatusPending}
+			t := queue.Task{ID: 42, ProjectID: input.ProjectID, Title: input.Title, Status: queue.StatusPending}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusCreated)
 			json.NewEncoder(w).Encode(t)

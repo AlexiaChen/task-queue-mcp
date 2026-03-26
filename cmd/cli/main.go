@@ -234,7 +234,7 @@ func newIssuesGetCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Com
 			}
 			out := cmd.OutOrStdout()
 			fmt.Fprintf(out, "ID:          %d\n", t.ID)
-			fmt.Fprintf(out, "Queue ID:    %d\n", t.QueueID)
+			fmt.Fprintf(out, "Project ID:  %d\n", t.ProjectID)
 			fmt.Fprintf(out, "Title:       %s\n", t.Title)
 			fmt.Fprintf(out, "Description: %s\n", t.Description)
 			fmt.Fprintf(out, "Status:      %s\n", colorStatus(t.Status))
@@ -272,7 +272,7 @@ func newIssuesCreateCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 				return fmt.Errorf("invalid priority: %w", err)
 			}
 			t, err := clientFn(cmd).CreateIssue(context.Background(), queue.CreateTaskInput{
-				QueueID:     queueID,
+				ProjectID:   queueID,
 				Title:       title,
 				Description: desc,
 				Priority:    prio,

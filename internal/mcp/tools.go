@@ -31,7 +31,7 @@ func (s *Server) registerTools() error {
 
 		s.mcp.AddTool(mcplib.NewTool("project_delete",
 			mcplib.WithDescription("Delete a project and all its issues"),
-			mcplib.WithNumber("queue_id",
+			mcplib.WithNumber("project_id",
 				mcplib.Required(),
 				mcplib.Description("ID of the project to delete"),
 			),
@@ -41,7 +41,7 @@ func (s *Server) registerTools() error {
 	// Always register issue list (read)
 	s.mcp.AddTool(mcplib.NewTool("issue_list",
 		mcplib.WithDescription("List issues in a project"),
-		mcplib.WithNumber("queue_id",
+		mcplib.WithNumber("project_id",
 			mcplib.Required(),
 			mcplib.Description("ID of the project"),
 		),
@@ -55,7 +55,7 @@ func (s *Server) registerTools() error {
 	if !s.readonly {
 		s.mcp.AddTool(mcplib.NewTool("issue_create",
 			mcplib.WithDescription("Create a new issue in a project"),
-			mcplib.WithNumber("queue_id",
+			mcplib.WithNumber("project_id",
 				mcplib.Required(),
 				mcplib.Description("ID of the project to add issue to"),
 			),
@@ -165,22 +165,22 @@ func (s *Server) handleProjectCreate(ctx context.Context, req mcplib.CallToolReq
 }
 
 func (s *Server) handleProjectDelete(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-	queueID, err := req.RequireInt("queue_id")
+	projectID, err := req.RequireInt("project_id")
 	if err != nil {
 		return mcplib.NewToolResultError(err.Error()), nil
 	}
 
-	if err := s.manager.DeleteProject(ctx, int64(queueID)); err != nil {
+	if err := s.manager.DeleteProject(ctx, int64(projectID)); err != nil {
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to delete queue: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Project %d deleted successfully", queueID)), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Project %d deleted successfully", projectID)), nil
 }
 
 // Task handlers
 
 func (s *Server) handleIssueList(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-	queueID, err := req.RequireInt("queue_id")
+	projectID, err := req.RequireInt("project_id")
 	if err != nil {
 		return mcplib.NewToolResultError(err.Error()), nil
 	}
@@ -191,7 +191,7 @@ func (s *Server) handleIssueList(ctx context.Context, req mcplib.CallToolRequest
 		status = &s
 	}
 
-	tasks, err := s.manager.ListIssues(ctx, int64(queueID), status)
+	tasks, err := s.manager.ListIssues(ctx, int64(projectID), status)
 	if err != nil {
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to list tasks: %v", err)), nil
 	}
@@ -205,7 +205,7 @@ func (s *Server) handleIssueList(ctx context.Context, req mcplib.CallToolRequest
 }
 
 func (s *Server) handleIssueCreate(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
-	queueID, err := req.RequireInt("queue_id")
+	projectID, err := req.RequireInt("project_id")
 	if err != nil {
 		return mcplib.NewToolResultError(err.Error()), nil
 	}
@@ -223,7 +223,7 @@ func (s *Server) handleIssueCreate(ctx context.Context, req mcplib.CallToolReque
 	}
 
 	task, err := s.manager.CreateIssue(ctx, queue.CreateTaskInput{
-		QueueID:     int64(queueID),
+		ProjectID:   int64(projectID),
 		Title:       title,
 		Description: description,
 		Priority:    priority,

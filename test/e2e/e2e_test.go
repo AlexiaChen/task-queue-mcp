@@ -97,7 +97,7 @@ func TestE2E_TaskCRUD(t *testing.T) {
 
 	// Create task
 	task, err := client.CreateIssue(map[string]interface{}{
-		"queue_id":    queueID,
+		"project_id":  queueID,
 		"title":       "E2E Test Task",
 		"description": "Test task description",
 		"priority":    "high",
@@ -176,17 +176,17 @@ func TestE2E_TaskPrioritization(t *testing.T) {
 
 	// Create multiple tasks: task1 and task2 with low priority, task3 with high priority
 	client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Task 1",
 		"priority": "low",
 	})
 	client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Task 2",
 		"priority": "low",
 	})
 	task3, _ := client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Task 3",
 		"priority": "high",
 	})
@@ -229,15 +229,15 @@ func TestE2E_QueueStats(t *testing.T) {
 
 	// Create tasks in different states
 	task1, _ := client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Pending Task",
 	})
 	task2, _ := client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Doing Task",
 	})
 	task3, _ := client.CreateIssue(map[string]interface{}{
-		"queue_id": queueID,
+		"project_id": queueID,
 		"title":    "Finished Task",
 	})
 
@@ -442,7 +442,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	// Create tasks
 	for i := 1; i <= 5; i++ {
 		_, err := manager.CreateIssue(ctx, queue.CreateTaskInput{
-			QueueID:     q.ID,
+			ProjectID:   q.ID,
 			Title:       fmt.Sprintf("Task %d", i),
 			Description: fmt.Sprintf("Description for task %d", i),
 			Priority:    queue.Priority(i % 3),
@@ -502,7 +502,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 	// Test prioritization: add a low-priority task first, then a high-priority one
 	// so the high-priority task can jump ahead of the lower-priority one.
 	lowPrioTask, err := manager.CreateIssue(ctx, queue.CreateTaskInput{
-		QueueID:  q.ID,
+		ProjectID:  q.ID,
 		Title:    "Low Priority Task",
 		Priority: queue.PriorityLow,
 	})
@@ -510,7 +510,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 		t.Fatalf("Failed to create low priority task: %v", err)
 	}
 	highPrioTask, err := manager.CreateIssue(ctx, queue.CreateTaskInput{
-		QueueID:  q.ID,
+		ProjectID:  q.ID,
 		Title:    "High Priority Task",
 		Priority: queue.PriorityHigh,
 	})

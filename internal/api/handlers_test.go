@@ -177,7 +177,7 @@ func TestAPI_UpdateTask(t *testing.T) {
 	// Create queue and task
 	q, _ := manager.CreateProject(context.Background(), queue.CreateQueueInput{Name: "Test"})
 	manager.CreateIssue(context.Background(), queue.CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 
@@ -208,7 +208,7 @@ func TestAPI_DeleteTask(t *testing.T) {
 	// Create queue and task
 	q, _ := manager.CreateProject(context.Background(), queue.CreateQueueInput{Name: "Test"})
 	manager.CreateIssue(context.Background(), queue.CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 
@@ -229,7 +229,7 @@ func TestAPI_PrioritizeTask(t *testing.T) {
 	// Create queue and task
 	q, _ := manager.CreateProject(context.Background(), queue.CreateQueueInput{Name: "Test"})
 	manager.CreateIssue(context.Background(), queue.CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 
@@ -252,7 +252,7 @@ func TestAPI_StartTask(t *testing.T) {
 	// Create queue and task
 	q, _ := manager.CreateProject(context.Background(), queue.CreateQueueInput{Name: "Test"})
 	manager.CreateIssue(context.Background(), queue.CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 
@@ -281,7 +281,7 @@ func TestAPI_FinishTask(t *testing.T) {
 	// Create queue and task, start it first
 	q, _ := manager.CreateProject(context.Background(), queue.CreateQueueInput{Name: "Test"})
 	task, _ := manager.CreateIssue(context.Background(), queue.CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 	manager.StartIssue(context.Background(), task.ID)

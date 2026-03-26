@@ -55,7 +55,7 @@ func (m *MockStorage) DeleteProject(ctx context.Context, id int64) error {
 	}
 	delete(m.queues, id)
 	for taskID, task := range m.tasks {
-		if task.QueueID == id {
+		if task.ProjectID == id {
 			delete(m.tasks, taskID)
 		}
 	}
@@ -65,7 +65,7 @@ func (m *MockStorage) DeleteProject(ctx context.Context, id int64) error {
 func (m *MockStorage) GetProjectStats(ctx context.Context, id int64) (*QueueStats, error) {
 	stats := &QueueStats{}
 	for _, task := range m.tasks {
-		if task.QueueID == id {
+		if task.ProjectID == id {
 			stats.Total++
 			switch task.Status {
 			case StatusPending:
@@ -83,14 +83,14 @@ func (m *MockStorage) GetProjectStats(ctx context.Context, id int64) (*QueueStat
 func (m *MockStorage) CreateIssue(ctx context.Context, input CreateTaskInput) (*Task, error) {
 	maxPos := 0
 	for _, t := range m.tasks {
-		if t.QueueID == input.QueueID && t.Position > maxPos {
+		if t.ProjectID == input.ProjectID && t.Position > maxPos {
 			maxPos = t.Position
 		}
 	}
 
 	task := &Task{
 		ID:          m.nextTask,
-		QueueID:     input.QueueID,
+		ProjectID:   input.ProjectID,
 		Title:       input.Title,
 		Description: input.Description,
 		Status:      StatusPending,
@@ -110,10 +110,10 @@ func (m *MockStorage) GetIssue(ctx context.Context, id int64) (*Task, error) {
 	return t, nil
 }
 
-func (m *MockStorage) ListIssues(ctx context.Context, queueID int64, status *TaskStatus) ([]*Task, error) {
+func (m *MockStorage) ListIssues(ctx context.Context, projectID int64, status *TaskStatus) ([]*Task, error) {
 	tasks := make([]*Task, 0)
 	for _, t := range m.tasks {
-		if t.QueueID == queueID {
+		if t.ProjectID == projectID {
 			if status == nil || t.Status == *status {
 				tasks = append(tasks, t)
 			}

@@ -98,7 +98,7 @@ type Queue struct {
 // Task represents a task in a queue
 type Task struct {
 	ID          int64      `json:"id"`
-	QueueID     int64      `json:"queue_id"`
+	ProjectID   int64      `json:"project_id"`
 	Title       string     `json:"title"`
 	Description string     `json:"description,omitempty"`
 	Status      TaskStatus `json:"status"`
@@ -118,7 +118,7 @@ type CreateQueueInput struct {
 
 // CreateTaskInput represents input for creating a task
 type CreateTaskInput struct {
-	QueueID     int64    `json:"queue_id"`
+	ProjectID   int64    `json:"project_id"`
 	Title       string   `json:"title"`
 	Description string   `json:"description,omitempty"`
 	Priority    Priority `json:"priority,omitempty"`

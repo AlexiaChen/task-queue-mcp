@@ -245,7 +245,7 @@ When asked to process an issue kanban using this MCP server, follow the workflow
 Use `project_list` to find the target project by name:
 
 ```
-project_list -> find project with matching name -> get queue_id
+project_list -> find project with matching name -> get project_id
 ```
 
 If the project doesn't exist, report an error and stop.
@@ -256,7 +256,7 @@ Repeat until all issues are finished:
 
 1. **Get pending issues** using `issue_list`:
    ```
-   issue_list(queue_id=<queue_id>) -> returns issues sorted by priority DESC, position ASC
+   issue_list(project_id=<project_id>) -> returns issues sorted by priority DESC, position ASC
    ```
 
 2. **Check for pending issues**:
@@ -296,7 +296,7 @@ ask_user(
 )
 ```
 
-- If user selects **"Continue current project"**: loop back to Step 2 with the same `queue_id` (new issues may have been added).
+- If user selects **"Continue current project"**: loop back to Step 2 with the same `project_id` (new issues may have been added).
 - If user selects **"Switch to another project"**: call `project_list`, let the user pick a new project, then restart from Step 1 with the new project name.
 - If user selects **"No, done"**: proceed to Step 4.
 

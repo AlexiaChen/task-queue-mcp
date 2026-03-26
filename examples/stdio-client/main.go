@@ -91,7 +91,7 @@ func main() {
 			Params: mcp.CallToolParams{
 				Name: "issue_create",
 				Arguments: map[string]interface{}{
-					"queue_id":    1,
+					"project_id":  1,
 					"title":       fmt.Sprintf("Task #%d", i),
 					"description": fmt.Sprintf("This is task number %d", i),
 					"priority":    10 - i,
@@ -156,7 +156,7 @@ func main() {
 		Params: mcp.CallToolParams{
 			Name: "issue_list",
 			Arguments: map[string]interface{}{
-				"queue_id": 1,
+				"project_id": 1,
 			},
 		},
 	})

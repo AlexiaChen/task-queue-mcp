@@ -33,7 +33,7 @@ func TestManager_CreateTask_EmptyTitle(t *testing.T) {
 	m := NewManager(NewMockStorage())
 
 	_, err := m.CreateIssue(context.Background(), CreateTaskInput{
-		QueueID: 1,
+		ProjectID: 1,
 		Title:   "",
 	})
 	if err == nil {
@@ -47,7 +47,7 @@ func TestManager_TaskStatusTransitions(t *testing.T) {
 	// Create queue and task
 	q, _ := m.CreateProject(context.Background(), CreateQueueInput{Name: "Test"})
 	task, _ := m.CreateIssue(context.Background(), CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 
@@ -84,7 +84,7 @@ func TestManager_InvalidStatus(t *testing.T) {
 
 	q, _ := m.CreateProject(context.Background(), CreateQueueInput{Name: "Test"})
 	task, _ := m.CreateIssue(context.Background(), CreateTaskInput{
-		QueueID: q.ID,
+		ProjectID: q.ID,
 		Title:   "Task",
 	})
 

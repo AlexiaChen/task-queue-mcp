@@ -70,7 +70,7 @@ func TestSQLiteStorage(t *testing.T) {
 
 	t.Run("CreateIssue", func(t *testing.T) {
 		task, err := store.CreateIssue(ctx, queue.CreateTaskInput{
-			QueueID:     1,
+			ProjectID:   1,
 			Title:       "Test Task",
 			Description: "Task Description",
 			Priority:    queue.PriorityHigh,
@@ -163,7 +163,7 @@ func TestSQLiteStorage(t *testing.T) {
 	t.Run("PrioritizeIssue", func(t *testing.T) {
 		// Create a low-priority task (will be at the front in queue position order)
 		taskLow, err := store.CreateIssue(ctx, queue.CreateTaskInput{
-			QueueID:  1,
+			ProjectID:  1,
 			Title:    "Low Priority Task",
 			Priority: queue.PriorityLow,
 		})
@@ -173,7 +173,7 @@ func TestSQLiteStorage(t *testing.T) {
 
 		// Create a medium-priority task (will be behind low-priority in queue)
 		taskMedium, err := store.CreateIssue(ctx, queue.CreateTaskInput{
-			QueueID:  1,
+			ProjectID:  1,
 			Title:    "Medium Priority Task",
 			Priority: queue.PriorityMedium,
 		})

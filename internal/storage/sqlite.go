@@ -108,7 +108,7 @@ func (s *SQLiteStorage) ListProjects(ctx context.Context) ([]*queue.Queue, error
 // DeleteProject deletes a queue and all its tasks
 func (s *SQLiteStorage) DeleteProject(ctx context.Context, id int64) error {
 	// First delete all tasks in the queue
-	_, err := s.db.ExecContext(ctx, "DELETE FROM tasks WHERE queue_id = ?", id)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM tasks WHERE project_id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete queue tasks: %w", err)
 	}
@@ -133,7 +133,7 @@ func (s *SQLiteStorage) DeleteProject(ctx context.Context, id int64) error {
 func (s *SQLiteStorage) GetProjectStats(ctx context.Context, id int64) (*queue.QueueStats, error) {
 	stats := &queue.QueueStats{}
 	err := s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tasks WHERE queue_id = ?",
+		"SELECT COUNT(*) FROM tasks WHERE project_id = ?",
 		id,
 	).Scan(&stats.Total)
 	if err != nil {
@@ -141,7 +141,7 @@ func (s *SQLiteStorage) GetProjectStats(ctx context.Context, id int64) (*queue.Q
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tasks WHERE queue_id = ? AND status = ?",
+		"SELECT COUNT(*) FROM tasks WHERE project_id = ? AND status = ?",
 		id, queue.StatusPending,
 	).Scan(&stats.Pending)
 	if err != nil {
@@ -149,7 +149,7 @@ func (s *SQLiteStorage) GetProjectStats(ctx context.Context, id int64) (*queue.Q
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tasks WHERE queue_id = ? AND status = ?",
+		"SELECT COUNT(*) FROM tasks WHERE project_id = ? AND status = ?",
 		id, queue.StatusDoing,
 	).Scan(&stats.Doing)
 	if err != nil {
@@ -157,7 +157,7 @@ func (s *SQLiteStorage) GetProjectStats(ctx context.Context, id int64) (*queue.Q
 	}
 
 	err = s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tasks WHERE queue_id = ? AND status = ?",
+		"SELECT COUNT(*) FROM tasks WHERE project_id = ? AND status = ?",
 		id, queue.StatusFinished,
 	).Scan(&stats.Finished)
 	if err != nil {
@@ -174,17 +174,17 @@ func (s *SQLiteStorage) CreateIssue(ctx context.Context, input queue.CreateTaskI
 	// Get the max position for the queue
 	var maxPosition int
 	err := s.db.QueryRowContext(ctx,
-		"SELECT COALESCE(MAX(position), 0) FROM tasks WHERE queue_id = ?",
-		input.QueueID,
+		"SELECT COALESCE(MAX(position), 0) FROM tasks WHERE project_id = ?",
+		input.ProjectID,
 	).Scan(&maxPosition)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get max position: %w", err)
 	}
 
 	result, err := s.db.ExecContext(ctx,
-		`INSERT INTO tasks (queue_id, title, description, status, priority, position, created_at, updated_at)
+		`INSERT INTO tasks (project_id, title, description, status, priority, position, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		input.QueueID, input.Title, input.Description, queue.StatusPending, input.Priority, maxPosition+1, now, now,
+		input.ProjectID, input.Title, input.Description, queue.StatusPending, input.Priority, maxPosition+1, now, now,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
@@ -203,10 +203,10 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id int64) (*queue.Task, er
 	t := &queue.Task{}
 	var startedAt, finishedAt sql.NullTime
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, queue_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
+		`SELECT id, project_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
 		 FROM tasks WHERE id = ?`,
 		id,
-	).Scan(&t.ID, &t.QueueID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Position,
+	).Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Position,
 		&t.CreatedAt, &t.UpdatedAt, &startedAt, &finishedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -225,18 +225,18 @@ func (s *SQLiteStorage) GetIssue(ctx context.Context, id int64) (*queue.Task, er
 }
 
 // ListIssues returns tasks in a queue, optionally filtered by status
-func (s *SQLiteStorage) ListIssues(ctx context.Context, queueID int64, status *queue.TaskStatus) ([]*queue.Task, error) {
+func (s *SQLiteStorage) ListIssues(ctx context.Context, projectID int64, status *queue.TaskStatus) ([]*queue.Task, error) {
 	var query string
 	var args []interface{}
 
 	if status != nil {
-		query = `SELECT id, queue_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
-				 FROM tasks WHERE queue_id = ? AND status = ? ORDER BY priority DESC, position ASC`
-		args = []interface{}{queueID, *status}
+		query = `SELECT id, project_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
+				 FROM tasks WHERE project_id = ? AND status = ? ORDER BY priority DESC, position ASC`
+		args = []interface{}{projectID, *status}
 	} else {
-		query = `SELECT id, queue_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
-				 FROM tasks WHERE queue_id = ? ORDER BY priority DESC, position ASC`
-		args = []interface{}{queueID}
+		query = `SELECT id, project_id, title, description, status, priority, position, created_at, updated_at, started_at, finished_at
+				 FROM tasks WHERE project_id = ? ORDER BY priority DESC, position ASC`
+		args = []interface{}{projectID}
 	}
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -249,7 +249,7 @@ func (s *SQLiteStorage) ListIssues(ctx context.Context, queueID int64, status *q
 	for rows.Next() {
 		t := &queue.Task{}
 		var startedAt, finishedAt sql.NullTime
-		if err := rows.Scan(&t.ID, &t.QueueID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Position,
+		if err := rows.Scan(&t.ID, &t.ProjectID, &t.Title, &t.Description, &t.Status, &t.Priority, &t.Position,
 			&t.CreatedAt, &t.UpdatedAt, &startedAt, &finishedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan task: %w", err)
 		}
@@ -380,8 +380,8 @@ func (s *SQLiteStorage) PrioritizeIssue(ctx context.Context, taskID int64) (*que
 	// Count lower-priority pending tasks in the same queue
 	var count int
 	err = s.db.QueryRowContext(ctx,
-		"SELECT COUNT(*) FROM tasks WHERE queue_id=? AND status='pending' AND priority < ? AND id != ?",
-		task.QueueID, int(task.Priority), taskID,
+		"SELECT COUNT(*) FROM tasks WHERE project_id=? AND status='pending' AND priority < ? AND id != ?",
+		task.ProjectID, int(task.Priority), taskID,
 	).Scan(&count)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count lower-priority tasks: %w", err)
@@ -393,8 +393,8 @@ func (s *SQLiteStorage) PrioritizeIssue(ctx context.Context, taskID int64) (*que
 	// Get the earliest position among lower-priority pending tasks
 	var minPos int
 	err = s.db.QueryRowContext(ctx,
-		"SELECT MIN(position) FROM tasks WHERE queue_id=? AND status='pending' AND priority < ?",
-		task.QueueID, int(task.Priority),
+		"SELECT MIN(position) FROM tasks WHERE project_id=? AND status='pending' AND priority < ?",
+		task.ProjectID, int(task.Priority),
 	).Scan(&minPos)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get min position: %w", err)
@@ -409,8 +409,8 @@ func (s *SQLiteStorage) PrioritizeIssue(ctx context.Context, taskID int64) (*que
 	// Shift all tasks at position >= minPos (except this task) back by one
 	_, err = tx.ExecContext(ctx,
 		`UPDATE tasks SET position = position + 1, updated_at = ?
-		 WHERE queue_id = ? AND position >= ? AND id != ?`,
-		time.Now(), task.QueueID, minPos, taskID,
+		 WHERE project_id = ? AND position >= ? AND id != ?`,
+		time.Now(), task.ProjectID, minPos, taskID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to shift tasks: %w", err)
@@ -445,7 +445,7 @@ func runMigrations(db *sql.DB) error {
 
 		CREATE TABLE IF NOT EXISTS tasks (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			queue_id INTEGER NOT NULL,
+			project_id INTEGER NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
 			status TEXT NOT NULL DEFAULT 'pending',
@@ -455,12 +455,43 @@ func runMigrations(db *sql.DB) error {
 			updated_at DATETIME NOT NULL,
 			started_at DATETIME,
 			finished_at DATETIME,
-			FOREIGN KEY (queue_id) REFERENCES queues(id) ON DELETE CASCADE
+			FOREIGN KEY (project_id) REFERENCES queues(id) ON DELETE CASCADE
 		);
 
-		CREATE INDEX IF NOT EXISTS idx_tasks_queue_id ON tasks(queue_id);
+		CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
 		CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
-		CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(queue_id, position);
+		CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(project_id, position);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Idempotent migration: rename queue_id → project_id on existing databases
+	var hasQueueID bool
+	rows, err := db.Query("PRAGMA table_info(tasks)")
+	if err != nil {
+		return fmt.Errorf("failed to query table_info: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notNull, pk int
+		var dfltValue interface{}
+		if err := rows.Scan(&cid, &name, &colType, &notNull, &dfltValue, &pk); err != nil {
+			return fmt.Errorf("failed to scan column info: %w", err)
+		}
+		if name == "queue_id" {
+			hasQueueID = true
+			break
+		}
+	}
+	rows.Close()
+	if hasQueueID {
+		if _, err := db.Exec("ALTER TABLE tasks RENAME COLUMN queue_id TO project_id"); err != nil {
+			return fmt.Errorf("failed to rename queue_id to project_id: %w", err)
+		}
+	}
+
+	return nil
 }

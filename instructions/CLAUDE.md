@@ -26,7 +26,7 @@ When asked to process an issue kanban, follow this workflow:
 Use `project_list` to find the target project by name:
 
 ```
-project_list -> find project with matching name -> get queue_id
+project_list -> find project with matching name -> get project_id
 ```
 
 If the project doesn't exist, report an error and stop.
@@ -37,7 +37,7 @@ Repeat until all issues are finished:
 
 1. **Get pending issues** using `issue_list`:
    ```
-   issue_list(queue_id=<queue_id>) -> returns issues sorted by priority DESC, position ASC
+   issue_list(project_id=<project_id>) -> returns issues sorted by priority DESC, position ASC
    ```
 
 2. **Check for pending issues**:
@@ -68,7 +68,7 @@ When the loop exits (no more pending issues in the current project), **do NOT im
 
 ```
 ask_user(
-  question = "Project '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
+  question = "Project '{queue_name}' (id={project_id}) is fully processed. Continue with the current queue?",
   choices  = [
     "Continue current project (re-check for newly added pending issues)",
     "Switch to another project",
@@ -77,7 +77,7 @@ ask_user(
 )
 ```
 
-- If user selects **"Continue current queue"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
+- If user selects **"Continue current queue"**: loop back to Step 2 with the same `project_id` (new tasks may have been added).
 - If user selects **"Switch to another project"**: call `project_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
 - If user selects **"No, done"**: proceed to Step 4.
 

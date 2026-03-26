@@ -25,7 +25,7 @@ type Storage interface {
 	// Task operations
 	CreateIssue(ctx context.Context, input CreateTaskInput) (*Task, error)
 	GetIssue(ctx context.Context, id int64) (*Task, error)
-	ListIssues(ctx context.Context, queueID int64, status *TaskStatus) ([]*Task, error)
+	ListIssues(ctx context.Context, projectID int64, status *TaskStatus) ([]*Task, error)
 	UpdateIssue(ctx context.Context, id int64, input UpdateTaskInput) (*Task, error)
 	EditIssue(ctx context.Context, id int64, input EditTaskInput) (*Task, error)
 	DeleteIssue(ctx context.Context, id int64) error
@@ -84,8 +84,8 @@ func (m *Manager) GetIssue(ctx context.Context, id int64) (*Task, error) {
 }
 
 // ListIssues returns tasks in a queue, optionally filtered by status
-func (m *Manager) ListIssues(ctx context.Context, queueID int64, status *TaskStatus) ([]*Task, error) {
-	return m.storage.ListIssues(ctx, queueID, status)
+func (m *Manager) ListIssues(ctx context.Context, projectID int64, status *TaskStatus) ([]*Task, error) {
+	return m.storage.ListIssues(ctx, projectID, status)
 }
 
 // UpdateIssue updates a task's status.

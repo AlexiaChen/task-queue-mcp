@@ -27,7 +27,7 @@ func (s *Server) registerResources() error {
 	// Dynamic resource: get specific project
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"project://{queue_id}",
+			"project://{project_id}",
 			"Project Details",
 			mcplib.WithResourceDescription("Get details of a specific project"),
 			mcplib.WithMIMEType("application/json"),
@@ -38,7 +38,7 @@ func (s *Server) registerResources() error {
 	// Dynamic resource: get issues in a project
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"project://{queue_id}/issues",
+			"project://{project_id}/issues",
 			"Project Issues",
 			mcplib.WithResourceDescription("Get all issues in a specific project"),
 			mcplib.WithMIMEType("application/json"),
@@ -101,7 +101,7 @@ func (s *Server) handleProjectListResource(ctx context.Context, req mcplib.ReadR
 }
 
 func (s *Server) handleProjectResource(ctx context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
-	// Extract queue_id from URI
+	// Extract project_id from URI
 	queueID, err := extractProjectID(req.Params.URI)
 	if err != nil {
 		return nil, err
@@ -140,7 +140,7 @@ func (s *Server) handleProjectResource(ctx context.Context, req mcplib.ReadResou
 }
 
 func (s *Server) handleProjectIssuesResource(ctx context.Context, req mcplib.ReadResourceRequest) ([]mcplib.ResourceContents, error) {
-	// Extract queue_id from URI
+	// Extract project_id from URI
 	queueID, err := extractProjectIDFromIssuesURI(req.Params.URI)
 	if err != nil {
 		return nil, err

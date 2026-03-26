@@ -447,7 +447,7 @@ func (a App) submitForm() (tea.Model, tea.Cmd) {
 			priority = p
 		}
 		input := queue.CreateTaskInput{
-			QueueID:     a.currentQueue.ID,
+			ProjectID:   a.currentQueue.ID,
 			Title:       title,
 			Description: desc,
 			Priority:    priority,

@@ -80,7 +80,7 @@ When instructed to process an issue kanban, the agent MUST:
 ### 1. Initialization Phase
 
 - Call `project_list` to retrieve all available projects
-- Match the specified queue name (case-sensitive) to get the `queue_id`
+- Match the specified queue name (case-sensitive) to get the `project_id`
 - If no match found, report error and terminate
 
 ### 2. Issue Processing Loop
@@ -89,7 +89,7 @@ The agent must execute this loop continuously:
 
 ```
 WHILE true:
-    tasks = issue_list(queue_id=queue_id)
+    tasks = issue_list(project_id=project_id)
 
     pending_issues = filter(issues, status="pending")
     pending_issues = sort(pending_issues, by=[priority DESC, position ASC])
@@ -124,7 +124,7 @@ After the issue processing loop exits (no more pending issues), the agent MUST i
 
 ```
 PRESENT interactive selection to user:
-    question = "Project '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?"
+    question = "Project '{queue_name}' (id={project_id}) is fully processed. Continue with the current queue?"
     choices  = [
         "Continue current project (re-check for newly added pending issues)",
         "Switch to another project (call project_list to select a new project)",
@@ -132,7 +132,7 @@ PRESENT interactive selection to user:
     ]
 
 IF user selects "Continue current project":
-    GOTO Issue Processing Loop (re-check same queue_id for new pending issues)
+    GOTO Issue Processing Loop (re-check same project_id for new pending issues)
 
 IF user selects "Switch to another project":
     project_list()  # Show all projects for user to pick next project
@@ -146,7 +146,7 @@ IF user selects "No, done":
 
 ```
 ask_user(
-  question = "Project '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
+  question = "Project '{queue_name}' (id={project_id}) is fully processed. Continue with the current queue?",
   choices  = [
     "Continue current project (re-check for newly added pending issues)",
     "Switch to another project",
@@ -195,7 +195,7 @@ The following tools are available to AI agents in readonly mode:
 | Tool | Description | Parameters |
 |------|-------------|------------|
 | `project_list` | List all projects | (none) |
-| `issue_list` | List tasks in queue | `queue_id`, `status?` |
+| `issue_list` | List tasks in queue | `project_id`, `status?` |
 | `issue_update` | Update task **status only** | `task_id`, `status` |
 
 > **Security boundary**: `issue_update` deliberately only accepts a `status` field. AI agents **cannot** modify an issue's title, description, or priority through MCP — those changes must go through the Web UI, TUI, or CLI (which call `PUT /api/issues/{id}`). This prevents unintended content mutation by AI agents.
