@@ -1,7 +1,7 @@
 .PHONY: build test run clean dev fmt lint help e2e e2e-quick
 
 # Binary name
-BINARY_NAME=task-queue-mcp
+BINARY_NAME=issue-kanban-mcp
 BINARY_PATH=./bin/$(BINARY_NAME)
 
 # Go parameters
@@ -32,15 +32,15 @@ build:
 build-tui:
 	@echo "Building TUI..."
 	@mkdir -p bin
-	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/task-queue-tui ./cmd/tui
-	@echo "TUI binary built at ./bin/task-queue-tui"
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/issue-kanban-tui ./cmd/tui
+	@echo "TUI binary built at ./bin/issue-kanban-tui"
 
 ## build-cli: Build the CLI binary
 build-cli:
 	@echo "Building CLI..."
 	@mkdir -p bin
-	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/task-queue-cli ./cmd/cli
-	@echo "CLI binary built at ./bin/task-queue-cli"
+	CGO_ENABLED=0 $(GOBUILD) -ldflags="-s -w" -o ./bin/issue-kanban-cli ./cmd/cli
+	@echo "CLI binary built at ./bin/issue-kanban-cli"
 
 ## build-all: Build all binaries (server, TUI, CLI)
 build-all: build build-tui build-cli
@@ -132,11 +132,11 @@ docker-run:
 ## api-test: Test the API endpoints (requires server running)
 api-test:
 	@echo "Testing API endpoints..."
-	@echo "Creating a queue..."
-	curl -X POST http://localhost:$(PORT)/api/queues -H "Content-Type: application/json" -d '{"name":"Test Queue","description":"A test queue"}'
+	@echo "Creating a project..."
+	curl -X POST http://localhost:$(PORT)/api/projects -H "Content-Type: application/json" -d '{"name":"Test Project","description":"A test project"}'
 	@echo ""
-	@echo "Listing queues..."
-	curl http://localhost:$(PORT)/api/queues
+	@echo "Listing projects..."
+	curl http://localhost:$(PORT)/api/projects
 	@echo ""
 
 ## e2e: Run end-to-end tests (starts server automatically)
@@ -169,7 +169,7 @@ example-stdio:
 
 ## help: Show this help message
 help:
-	@echo "Task Queue MCP Server - Makefile Commands"
+	@echo "Issue Kanban MCP Server - Makefile Commands"
 	@echo ""
 	@echo "Usage: make [target]"
 	@echo ""

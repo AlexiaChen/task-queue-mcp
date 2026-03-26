@@ -14,7 +14,7 @@ RUN go mod download
 COPY . .
 
 # Build binary (CGO_ENABLED=0 for static build, modernc.org/sqlite is pure Go)
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/task-queue-mcp ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/issue-kanban-mcp ./cmd/server
 
 # Final stage
 FROM alpine:3.19
@@ -25,7 +25,7 @@ WORKDIR /app
 RUN apk --no-cache add ca-certificates
 
 # Copy binary from builder
-COPY --from=builder /app/bin/task-queue-mcp /app/
+COPY --from=builder /app/bin/issue-kanban-mcp /app/
 
 # Create data directory
 RUN mkdir -p /app/data
@@ -38,5 +38,5 @@ ENV PORT=9292
 ENV DB_PATH=/app/data/tasks.db
 
 # Run the binary
-ENTRYPOINT ["/app/task-queue-mcp"]
+ENTRYPOINT ["/app/issue-kanban-mcp"]
 CMD ["-port=9292", "-db=/app/data/tasks.db", "-mcp=http"]

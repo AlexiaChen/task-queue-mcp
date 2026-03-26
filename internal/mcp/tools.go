@@ -12,38 +12,38 @@ import (
 // registerTools registers all MCP tools
 func (s *Server) registerTools() error {
 	// Always register read tools
-	s.mcp.AddTool(mcplib.NewTool("queue_list",
-		mcplib.WithDescription("List all task queues with their statistics"),
+	s.mcp.AddTool(mcplib.NewTool("project_list",
+		mcplib.WithDescription("List all projects with their statistics"),
 	), s.handleQueueList)
 
 	// Admin-only tools (not exposed in readonly mode)
 	if !s.readonly {
-		s.mcp.AddTool(mcplib.NewTool("queue_create",
-			mcplib.WithDescription("Create a new task queue"),
+		s.mcp.AddTool(mcplib.NewTool("project_create",
+			mcplib.WithDescription("Create a new project"),
 			mcplib.WithString("name",
 				mcplib.Required(),
-				mcplib.Description("Unique name for the queue"),
+				mcplib.Description("Unique name for the project"),
 			),
 			mcplib.WithString("description",
-				mcplib.Description("Optional description for the queue"),
+				mcplib.Description("Optional description for the project"),
 			),
 		), s.handleQueueCreate)
 
-		s.mcp.AddTool(mcplib.NewTool("queue_delete",
-			mcplib.WithDescription("Delete a task queue and all its tasks"),
+		s.mcp.AddTool(mcplib.NewTool("project_delete",
+			mcplib.WithDescription("Delete a project and all its issues"),
 			mcplib.WithNumber("queue_id",
 				mcplib.Required(),
-				mcplib.Description("ID of the queue to delete"),
+				mcplib.Description("ID of the project to delete"),
 			),
 		), s.handleQueueDelete)
 	}
 
-	// Always register task list (read)
-	s.mcp.AddTool(mcplib.NewTool("task_list",
-		mcplib.WithDescription("List tasks in a queue"),
+	// Always register issue list (read)
+	s.mcp.AddTool(mcplib.NewTool("issue_list",
+		mcplib.WithDescription("List issues in a project"),
 		mcplib.WithNumber("queue_id",
 			mcplib.Required(),
-			mcplib.Description("ID of the queue"),
+			mcplib.Description("ID of the project"),
 		),
 		mcplib.WithString("status",
 			mcplib.Description("Filter by status: pending, doing, or finished"),
@@ -53,18 +53,18 @@ func (s *Server) registerTools() error {
 
 	// Admin-only tools (not exposed in readonly mode)
 	if !s.readonly {
-		s.mcp.AddTool(mcplib.NewTool("task_create",
-			mcplib.WithDescription("Create a new task in a queue"),
+		s.mcp.AddTool(mcplib.NewTool("issue_create",
+			mcplib.WithDescription("Create a new issue in a project"),
 			mcplib.WithNumber("queue_id",
 				mcplib.Required(),
-				mcplib.Description("ID of the queue to add task to"),
+				mcplib.Description("ID of the project to add issue to"),
 			),
 			mcplib.WithString("title",
 				mcplib.Required(),
-				mcplib.Description("Title of the task"),
+				mcplib.Description("Title of the issue"),
 			),
 			mcplib.WithString("description",
-				mcplib.Description("Optional description of the task"),
+				mcplib.Description("Optional description of the issue"),
 			),
 			mcplib.WithNumber("priority",
 				mcplib.Description("Priority level (higher = more urgent)"),
@@ -72,33 +72,33 @@ func (s *Server) registerTools() error {
 			),
 		), s.handleTaskCreate)
 
-		s.mcp.AddTool(mcplib.NewTool("task_delete",
-			mcplib.WithDescription("Delete a task"),
+		s.mcp.AddTool(mcplib.NewTool("issue_delete",
+			mcplib.WithDescription("Delete an issue"),
 			mcplib.WithNumber("task_id",
 				mcplib.Required(),
-				mcplib.Description("ID of the task to delete"),
+				mcplib.Description("ID of the issue to delete"),
 			),
 		), s.handleTaskDelete)
 
-		s.mcp.AddTool(mcplib.NewTool("task_prioritize",
-			mcplib.WithDescription("Move a task to a higher priority position in the queue (插队)"),
+		s.mcp.AddTool(mcplib.NewTool("issue_prioritize",
+			mcplib.WithDescription("Move an issue to a higher priority position in the project (插队)"),
 			mcplib.WithNumber("task_id",
 				mcplib.Required(),
-				mcplib.Description("ID of the task to prioritize"),
+				mcplib.Description("ID of the issue to prioritize"),
 			),
 			mcplib.WithNumber("position",
-				mcplib.Description("Target position (1 = front of queue). If not specified, moves to front."),
+				mcplib.Description("Target position (1 = front of project). If not specified, moves to front."),
 				mcplib.DefaultNumber(1),
 			),
 		), s.handleTaskPrioritize)
 	}
 
-	// Always allow status update (AI can process tasks)
-	s.mcp.AddTool(mcplib.NewTool("task_update",
-		mcplib.WithDescription("Update a task's status"),
+	// Always allow status update (AI can process issues)
+	s.mcp.AddTool(mcplib.NewTool("issue_update",
+		mcplib.WithDescription("Update an issue's status"),
 		mcplib.WithNumber("task_id",
 			mcplib.Required(),
-			mcplib.Description("ID of the task to update"),
+			mcplib.Description("ID of the issue to update"),
 		),
 		mcplib.WithString("status",
 			mcplib.Required(),
@@ -165,7 +165,7 @@ func (s *Server) handleQueueCreate(ctx context.Context, req mcplib.CallToolReque
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Queue created successfully:\n%s", string(data))), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Project created successfully:\n%s", string(data))), nil
 }
 
 func (s *Server) handleQueueDelete(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
@@ -178,7 +178,7 @@ func (s *Server) handleQueueDelete(ctx context.Context, req mcplib.CallToolReque
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to delete queue: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Queue %d deleted successfully", queueID)), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Project %d deleted successfully", queueID)), nil
 }
 
 // Task handlers
@@ -237,7 +237,7 @@ func (s *Server) handleTaskCreate(ctx context.Context, req mcplib.CallToolReques
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Task created successfully:\n%s", string(data))), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Issue created successfully:\n%s", string(data))), nil
 }
 
 func (s *Server) handleTaskUpdate(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
@@ -264,7 +264,7 @@ func (s *Server) handleTaskUpdate(ctx context.Context, req mcplib.CallToolReques
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Task updated successfully:\n%s", string(data))), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Issue updated successfully:\n%s", string(data))), nil
 }
 
 func (s *Server) handleTaskDelete(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
@@ -277,7 +277,7 @@ func (s *Server) handleTaskDelete(ctx context.Context, req mcplib.CallToolReques
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to delete task: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Task %d deleted successfully", taskID)), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Issue %d deleted successfully", taskID)), nil
 }
 
 func (s *Server) handleTaskPrioritize(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
@@ -298,5 +298,5 @@ func (s *Server) handleTaskPrioritize(ctx context.Context, req mcplib.CallToolRe
 		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
 	}
 
-	return mcplib.NewToolResultText(fmt.Sprintf("Task prioritized successfully (moved to position %d):\n%s", position, string(data))), nil
+	return mcplib.NewToolResultText(fmt.Sprintf("Issue prioritized successfully (moved to position %d):\n%s", position, string(data))), nil
 }

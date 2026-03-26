@@ -98,11 +98,11 @@ document.addEventListener('DOMContentLoaded', () => {
 // Queue functions
 async function loadQueues() {
     try {
-        const queues = await api.get('/api/queues');
+        const queues = await api.get('/api/projects');
         renderQueues(queues);
     } catch (err) {
-        console.error('Failed to load queues:', err);
-        alert('Failed to load queues: ' + err.message);
+        console.error('Failed to load projects:', err);
+        alert('Failed to load projects: ' + err.message);
     }
 }
 
@@ -110,7 +110,7 @@ function renderQueues(queues) {
     if (queues.length === 0) {
         queuesList.innerHTML = `
             <div class="empty-state">
-                <p>No queues yet. Create your first queue to get started!</p>
+                <p>No projects yet. Create your first project to get started!</p>
             </div>
         `;
         return;
@@ -141,16 +141,16 @@ async function showQueueDetail(queueId) {
 async function loadQueueDetail(queueId) {
     try {
         const [queue, tasks] = await Promise.all([
-            api.get(`/api/queues/${queueId}`),
-            api.get(`/api/queues/${queueId}/tasks`)
+            api.get(`/api/projects/${queueId}`),
+            api.get(`/api/projects/${queueId}/issues`)
         ]);
 
         queueTitle.textContent = queue.name;
         renderQueueStats(queue.stats);
         renderTasks(tasks);
     } catch (err) {
-        console.error('Failed to load queue:', err);
-        alert('Failed to load queue: ' + err.message);
+        console.error('Failed to load project:', err);
+        alert('Failed to load project: ' + err.message);
     }
 }
 
@@ -179,7 +179,7 @@ function renderTasks(tasks) {
     if (tasks.length === 0) {
         tasksList.innerHTML = `
             <div class="empty-state">
-                <p>No tasks in this queue. Add your first task!</p>
+                <p>No issues in this project. Add your first issue!</p>
             </div>
         `;
         return;
@@ -235,47 +235,47 @@ function stopAutoRefresh() {
 // Task actions
 async function editTask(taskId) {
     try {
-        const task = await api.get(`/api/tasks/${taskId}`);
+        const task = await api.get(`/api/issues/${taskId}`);
         showTaskModal(task);
     } catch (err) {
-        alert('Failed to load task: ' + err.message);
+        alert('Failed to load issue: ' + err.message);
     }
 }
 
 async function prioritizeTask(taskId) {
     try {
-        await api.post(`/api/tasks/${taskId}/prioritize`, { position: 1 });
+        await api.post(`/api/issues/${taskId}/prioritize`, { position: 1 });
         loadQueueDetail(currentQueueId);
     } catch (err) {
-        alert('Failed to prioritize task: ' + err.message);
+        alert('Failed to prioritize issue: ' + err.message);
     }
 }
 
 async function deleteTask(taskId) {
-    if (!confirm('Are you sure you want to delete this task?')) return;
+    if (!confirm('Are you sure you want to delete this issue?')) return;
 
     try {
-        await api.delete(`/api/tasks/${taskId}`);
+        await api.delete(`/api/issues/${taskId}`);
         loadQueueDetail(currentQueueId);
     } catch (err) {
-        alert('Failed to delete task: ' + err.message);
+        alert('Failed to delete issue: ' + err.message);
     }
 }
 
 async function deleteCurrentQueue() {
-    if (!confirm('Are you sure you want to delete this queue and all its tasks?')) return;
+    if (!confirm('Are you sure you want to delete this project and all its issues?')) return;
 
     try {
-        await api.delete(`/api/queues/${currentQueueId}`);
+        await api.delete(`/api/projects/${currentQueueId}`);
         showQueuesList();
     } catch (err) {
-        alert('Failed to delete queue: ' + err.message);
+        alert('Failed to delete project: ' + err.message);
     }
 }
 
 // Modal functions
 function showQueueModal(queue = null) {
-    modalTitle.textContent = queue ? 'Edit Queue' : 'Create Queue';
+    modalTitle.textContent = queue ? 'Edit Project' : 'Create Project';
     modalForm.innerHTML = `
         <div class="form-group">
             <label for="name">Name *</label>
@@ -295,11 +295,11 @@ function showQueueModal(queue = null) {
         };
 
         try {
-            await api.post('/api/queues', data);
+            await api.post('/api/projects', data);
             hideModal();
             loadQueues();
         } catch (err) {
-            alert('Failed to create queue: ' + err.message);
+            alert('Failed to create project: ' + err.message);
         }
     };
 
@@ -307,7 +307,7 @@ function showQueueModal(queue = null) {
 }
 
 function showTaskModal(task = null) {
-    modalTitle.textContent = task ? 'Edit Task' : 'Create Task';
+    modalTitle.textContent = task ? 'Edit Issue' : 'Create Issue';
     modalForm.innerHTML = `
         <div class="form-group">
             <label for="title">Title *</label>
@@ -328,13 +328,13 @@ function showTaskModal(task = null) {
 
         try {
             if (task) {
-                await api.put(`/api/tasks/${task.id}`, {
+                await api.put(`/api/issues/${task.id}`, {
                     title: formData.get('title'),
                     description: formData.get('description'),
                     priority: parseInt(formData.get('priority')) || 0
                 });
             } else {
-                await api.post('/api/tasks', {
+                await api.post('/api/issues', {
                     queue_id: currentQueueId,
                     title: formData.get('title'),
                     description: formData.get('description'),
@@ -344,7 +344,7 @@ function showTaskModal(task = null) {
             hideModal();
             loadQueueDetail(currentQueueId);
         } catch (err) {
-            alert((task ? 'Failed to update task: ' : 'Failed to create task: ') + err.message);
+            alert((task ? 'Failed to update issue: ' : 'Failed to create issue: ') + err.message);
         }
     };
 

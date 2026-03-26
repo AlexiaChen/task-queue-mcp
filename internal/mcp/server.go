@@ -22,11 +22,11 @@ func WithReadonlyMode(readonly bool) ServerOption {
 	}
 }
 
-// NewServer creates a new MCP server for task queue management
+// NewServer creates a new MCP server for issue kanban management
 func NewServer(manager *queue.Manager, opts ...ServerOption) (*Server, error) {
 	s := &Server{
 		mcp: server.NewMCPServer(
-			"Task Queue MCP Server",
+			"Issue Kanban MCP Server",
 			"1.0.0",
 			server.WithToolCapabilities(true),
 			server.WithResourceCapabilities(true, true),

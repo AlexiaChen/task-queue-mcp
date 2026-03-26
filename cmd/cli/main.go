@@ -41,9 +41,9 @@ func newRootCmd() *cobra.Command {
 	var serverURL string
 
 	root := &cobra.Command{
-		Use:   "task-queue-cli",
-		Short: "CLI for the task-queue-mcp server",
-		Long:  "A command-line interface for managing issue kanbans via the task-queue-mcp REST API.",
+		Use:   "issue-kanban-cli",
+		Short: "CLI for the issue-kanban-mcp server",
+		Long:  "A command-line interface for managing issue kanbans via the issue-kanban-mcp REST API.",
 	}
 	root.PersistentFlags().StringVar(&serverURL, "server", "http://localhost:9292", "server base URL")
 
@@ -57,12 +57,12 @@ func newRootCmd() *cobra.Command {
 	return root
 }
 
-// ---- queues ----
+// ---- projects ----
 
 func newQueuesCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "queues",
-		Short: "Manage queues",
+		Use:   "projects",
+		Short: "Manage projects",
 	}
 	cmd.AddCommand(newQueuesListCmd(clientFn))
 	cmd.AddCommand(newQueuesCreateCmd(clientFn))
@@ -74,7 +74,7 @@ func newQueuesCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Comman
 func newQueuesListCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
-		Short: "List all queues",
+		Short: "List all projects",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			queues, err := clientFn(cmd).ListQueues(context.Background())
 			if err != nil {
@@ -96,7 +96,7 @@ func newQueuesCreateCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 	var name, desc string
 	cmd := &cobra.Command{
 		Use:   "create",
-		Short: "Create a queue",
+		Short: "Create a project",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if name == "" {
 				return fmt.Errorf("--name is required")
@@ -108,12 +108,12 @@ func newQueuesCreateCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created queue %d: %s\n", q.ID, q.Name)
+			fmt.Fprintf(cmd.OutOrStdout(), "Created project %d: %s\n", q.ID, q.Name)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&name, "name", "", "queue name (required)")
-	cmd.Flags().StringVar(&desc, "desc", "", "queue description")
+	cmd.Flags().StringVar(&name, "name", "", "project name (required)")
+	cmd.Flags().StringVar(&desc, "desc", "", "project description")
 	return cmd
 }
 
@@ -121,7 +121,7 @@ func newQueuesDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <id>",
-		Short: "Delete a queue",
+		Short: "Delete a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -129,7 +129,7 @@ func newQueuesDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 				return fmt.Errorf("invalid id: %w", err)
 			}
 			if !yes {
-				fmt.Fprintf(cmd.OutOrStdout(), "Delete queue %d? [y/N]: ", id)
+				fmt.Fprintf(cmd.OutOrStdout(), "Delete project %d? [y/N]: ", id)
 				scanner := bufio.NewScanner(os.Stdin)
 				if scanner.Scan() {
 					if strings.ToLower(strings.TrimSpace(scanner.Text())) != "y" {
@@ -141,7 +141,7 @@ func newQueuesDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 			if err := clientFn(cmd).DeleteQueue(context.Background(), id); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted queue %d\n", id)
+			fmt.Fprintf(cmd.OutOrStdout(), "Deleted project %d\n", id)
 			return nil
 		},
 	}
@@ -152,7 +152,7 @@ func newQueuesDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.
 func newQueuesStatsCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stats <id>",
-		Short: "Show stats for a queue",
+		Short: "Show stats for a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -164,7 +164,7 @@ func newQueuesStatsCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 				return err
 			}
 			out := cmd.OutOrStdout()
-			fmt.Fprintf(out, "Queue %d stats:\n", id)
+			fmt.Fprintf(out, "Project %d stats:\n", id)
 			fmt.Fprintf(out, "  Total:    %d\n", stats.Total)
 			fmt.Fprintf(out, "  Pending:  %d\n", stats.Pending)
 			fmt.Fprintf(out, "  Doing:    %d\n", stats.Doing)
@@ -174,12 +174,12 @@ func newQueuesStatsCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 	}
 }
 
-// ---- tasks ----
+// ---- issues ----
 
 func newTasksCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "tasks",
-		Short: "Manage tasks",
+		Use:   "issues",
+		Short: "Manage issues",
 	}
 	cmd.AddCommand(newTasksListCmd(clientFn))
 	cmd.AddCommand(newTasksGetCmd(clientFn))
@@ -193,13 +193,13 @@ func newTasksCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command
 func newTasksListCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	var statusFilter string
 	cmd := &cobra.Command{
-		Use:   "list <queue-id>",
-		Short: "List tasks in a queue",
+		Use:   "list <project-id>",
+		Short: "List issues in a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			queueID, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("invalid queue-id: %w", err)
+				return fmt.Errorf("invalid project-id: %w", err)
 			}
 			tasks, err := clientFn(cmd).ListTasks(context.Background(), queueID, statusFilter)
 			if err != nil {
@@ -221,7 +221,7 @@ func newTasksListCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Com
 func newTasksGetCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "get <id>",
-		Short: "Get task details",
+		Short: "Get issue details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -257,13 +257,13 @@ func newTasksCreateCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 	var title, desc string
 	var priority int
 	cmd := &cobra.Command{
-		Use:   "create <queue-id>",
-		Short: "Create a task",
+		Use:   "create <project-id>",
+		Short: "Create an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			queueID, err := strconv.ParseInt(args[0], 10, 64)
 			if err != nil {
-				return fmt.Errorf("invalid queue-id: %w", err)
+				return fmt.Errorf("invalid project-id: %w", err)
 			}
 			if title == "" {
 				return fmt.Errorf("--title is required")
@@ -277,13 +277,13 @@ func newTasksCreateCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Created task %d: %s\n", t.ID, t.Title)
+			fmt.Fprintf(cmd.OutOrStdout(), "Created issue %d: %s\n", t.ID, t.Title)
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&title, "title", "", "task title (required)")
-	cmd.Flags().StringVar(&desc, "desc", "", "task description")
-	cmd.Flags().IntVar(&priority, "priority", 0, "task priority")
+	cmd.Flags().StringVar(&title, "title", "", "issue title (required)")
+	cmd.Flags().StringVar(&desc, "desc", "", "issue description")
+	cmd.Flags().IntVar(&priority, "priority", 0, "issue priority")
 	return cmd
 }
 
@@ -292,7 +292,7 @@ func newTasksEditCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Com
 	var priority int
 	cmd := &cobra.Command{
 		Use:   "edit <id>",
-		Short: "Edit a pending task's title, description, or priority",
+		Short: "Edit a pending issue's title, description, or priority",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -317,7 +317,7 @@ func newTasksEditCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Com
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Task %d updated: %s\n", t.ID, t.Title)
+			fmt.Fprintf(cmd.OutOrStdout(), "Issue %d updated: %s\n", t.ID, t.Title)
 			return nil
 		},
 	}
@@ -331,7 +331,7 @@ func newTasksDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 	var yes bool
 	cmd := &cobra.Command{
 		Use:   "delete <id>",
-		Short: "Delete a task",
+		Short: "Delete an issue",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -339,7 +339,7 @@ func newTasksDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 				return fmt.Errorf("invalid id: %w", err)
 			}
 			if !yes {
-				fmt.Fprintf(cmd.OutOrStdout(), "Delete task %d? [y/N]: ", id)
+				fmt.Fprintf(cmd.OutOrStdout(), "Delete issue %d? [y/N]: ", id)
 				scanner := bufio.NewScanner(os.Stdin)
 				if scanner.Scan() {
 					if strings.ToLower(strings.TrimSpace(scanner.Text())) != "y" {
@@ -351,7 +351,7 @@ func newTasksDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 			if err := clientFn(cmd).DeleteTask(context.Background(), id); err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Deleted task %d\n", id)
+			fmt.Fprintf(cmd.OutOrStdout(), "Deleted issue %d\n", id)
 			return nil
 		},
 	}
@@ -362,7 +362,7 @@ func newTasksDeleteCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.C
 func newTasksPrioritizeCmd(clientFn func(*cobra.Command) *apiclient.Client) *cobra.Command {
 	return &cobra.Command{
 		Use:   "prioritize <id>",
-		Short: "Move a task to the front of its queue",
+		Short: "Move an issue to the front of its project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			id, err := strconv.ParseInt(args[0], 10, 64)
@@ -373,7 +373,7 @@ func newTasksPrioritizeCmd(clientFn func(*cobra.Command) *apiclient.Client) *cob
 			if err != nil {
 				return err
 			}
-			fmt.Fprintf(cmd.OutOrStdout(), "Task %d moved to front: %s\n", t.ID, t.Title)
+			fmt.Fprintf(cmd.OutOrStdout(), "Issue %d moved to front: %s\n", t.ID, t.Title)
 			return nil
 		},
 	}

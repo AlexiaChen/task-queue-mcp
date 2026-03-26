@@ -226,7 +226,7 @@ func (a App) handleQueueListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "d":
 		if len(a.queues) > 0 && a.queueIdx < len(a.queues) {
 			q := a.queues[a.queueIdx]
-			a.pendingDelete = pendingDeleteInfo{kind: "queue", id: q.ID, name: q.Name}
+			a.pendingDelete = pendingDeleteInfo{kind: "project", id: q.ID, name: q.Name}
 			a.state = viewConfirmDelete
 		}
 	case "R":
@@ -260,7 +260,7 @@ func (a App) handleTaskListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "d":
 		if len(a.tasks) > 0 && a.taskIdx < len(a.tasks) {
 			t := a.tasks[a.taskIdx]
-			a.pendingDelete = pendingDeleteInfo{kind: "task", id: t.ID, name: t.Title}
+			a.pendingDelete = pendingDeleteInfo{kind: "issue", id: t.ID, name: t.Title}
 			a.state = viewConfirmDelete
 		}
 	case "e":
@@ -387,7 +387,7 @@ func (a App) handleConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y":
 		return a.doDelete()
 	case "n", "esc":
-		if a.pendingDelete.kind == "queue" {
+		if a.pendingDelete.kind == "project" {
 			a.state = viewQueueList
 		} else {
 			a.state = viewTaskList
@@ -419,7 +419,7 @@ func (a App) submitForm() (tea.Model, tea.Cmd) {
 			return a, nil
 		}
 		if a.currentQueue == nil {
-			a.statusMsg = "No queue selected"
+			a.statusMsg = "No project selected"
 			a.isError = true
 			return a, nil
 		}
@@ -501,14 +501,14 @@ func (a App) doCreateTask(input queue.CreateTaskInput) tea.Cmd {
 func (a App) doDelete() (tea.Model, tea.Cmd) {
 	kind := a.pendingDelete.kind
 	id := a.pendingDelete.id
-	if kind == "queue" {
+	if kind == "project" {
 		a.state = viewQueueList
 	} else {
 		a.state = viewTaskList
 	}
 	return a, func() tea.Msg {
 		var err error
-		if kind == "queue" {
+		if kind == "project" {
 			err = a.client.DeleteQueue(context.Background(), id)
 		} else {
 			err = a.client.DeleteTask(context.Background(), id)
@@ -573,7 +573,7 @@ func (a App) viewQueueList() string {
 	sb.WriteString("\n\n")
 
 	if len(a.queues) == 0 {
-		sb.WriteString(dimStyle.Render("  No queues yet. Press 'n' to create one."))
+		sb.WriteString(dimStyle.Render("  No projects yet. Press 'n' to create one."))
 		sb.WriteString("\n")
 	} else {
 		for i, q := range a.queues {
@@ -613,7 +613,7 @@ func (a App) viewTaskList() string {
 	sb.WriteString("\n\n")
 
 	if len(a.tasks) == 0 {
-		sb.WriteString(dimStyle.Render("  No tasks yet. Press 'n' to create one."))
+		sb.WriteString(dimStyle.Render("  No issues yet. Press 'n' to create one."))
 		sb.WriteString("\n")
 	} else {
 		for i, t := range a.tasks {
@@ -643,13 +643,13 @@ func (a App) viewCreateForm() string {
 	var formTitle string
 	var labels []string
 	if a.formMode == "queue" {
-		formTitle = "Create New Queue"
+		formTitle = "Create New Project"
 		labels = []string{"Name:", "Description:"}
 	} else if a.formMode == "edit" {
-		formTitle = "Edit Task"
+		formTitle = "Edit Issue"
 		labels = []string{"Title:", "Description:", "Priority:"}
 	} else {
-		formTitle = "Create New Task"
+		formTitle = "Create New Issue"
 		labels = []string{"Title:", "Description:", "Priority:"}
 	}
 
@@ -728,7 +728,7 @@ func taskStatusLabel(status queue.TaskStatus) string {
 
 func makeQueueInputs() []textinput.Model {
 	name := textinput.New()
-	name.Placeholder = "Queue name (required)"
+	name.Placeholder = "Project name (required)"
 	name.CharLimit = 100
 
 	desc := textinput.New()
@@ -740,7 +740,7 @@ func makeQueueInputs() []textinput.Model {
 
 func makeTaskInputs() []textinput.Model {
 	title := textinput.New()
-	title.Placeholder = "Task title (required)"
+	title.Placeholder = "Issue title (required)"
 	title.CharLimit = 200
 
 	prio := textinput.New()
@@ -752,7 +752,7 @@ func makeTaskInputs() []textinput.Model {
 
 func makeEditTaskInputs(t queue.Task) []textinput.Model {
 	title := textinput.New()
-	title.Placeholder = "Task title (required)"
+	title.Placeholder = "Issue title (required)"
 	title.CharLimit = 200
 	title.SetValue(t.Title)
 

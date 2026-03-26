@@ -1,6 +1,6 @@
 # Issue Kanban Processor Agent Instruction
 
-This instruction configures an AI agent to autonomously process tasks from a specified kanban in the Issue Kanban MCP Server until all tasks are completed.
+This instruction configures an AI agent to autonomously process issues from a specified project in the Issue Kanban MCP Server until all issues are completed.
 
 ## MCP Server Configuration
 
@@ -11,9 +11,9 @@ The server defaults to readonly mode (safe for AI agents):
 ```json
 {
   "servers": {
-    "task-queue": {
+    "issue-kanban": {
       "type": "stdio",
-      "command": "/path/to/task-queue-mcp",
+      "command": "/path/to/issue-kanban-mcp",
       "args": ["-mcp=stdio", "-db=/path/to/tasks.db"],
       "tools": ["*"]
     }
@@ -26,7 +26,7 @@ The server defaults to readonly mode (safe for AI agents):
 ```json
 {
   "servers": {
-    "task-queue": {
+    "issue-kanban": {
       "type": "sse",
       "url": "http://localhost:9292/sse",
       "tools": ["*"]
@@ -43,96 +43,96 @@ When instructed to process an issue kanban, the agent MUST:
 
 ### 1. Initialization Phase
 
-- Call `queue_list` to retrieve all available queues
+- Call `project_list` to retrieve all available projects
 - Match the specified queue name (case-sensitive) to get the `queue_id`
 - If no match found, report error and terminate
 
-### 2. Task Processing Loop
+### 2. Issue Processing Loop
 
 The agent must execute this loop continuously:
 
 ```
 WHILE true:
-    tasks = task_list(queue_id=queue_id)
+    tasks = issue_list(queue_id=queue_id)
 
-    pending_tasks = filter(tasks, status="pending")
-    pending_tasks = sort(pending_tasks, by=[priority DESC, position ASC])
+    pending_issues = filter(issues, status="pending")
+    pending_issues = sort(pending_issues, by=[priority DESC, position ASC])
 
-    IF pending_tasks is empty:
-        BREAK  # All tasks completed
+    IF pending_issues is empty:
+        BREAK  # All issues completed
 
-    current_task = pending_tasks[0]  # First task in order
+    current_issue = pending_issues[0]  # First issue in order
 
-    # Start task
-    task_update(task_id=current_task.id, status="doing")
+    # Start issue
+    issue_update(task_id=current_task.id, status="doing")
 
     # Execute the actual work
-    execute(current_task.title, current_task.description)
+    execute(current_issue.title, current_issue.description)
 
-    # Complete task
-    task_update(task_id=current_task.id, status="finished")
+    # Complete issue
+    issue_update(task_id=current_task.id, status="finished")
 ```
 
-### 3. Task Execution
+### 3. Issue Execution
 
-For each task:
+For each issue:
 - **Understand**: Read and comprehend `title` and `description`
-- **Plan**: Determine the steps needed to complete the task
+- **Plan**: Determine the steps needed to complete the issue
 - **Execute**: Perform the actual work (code, analysis, documentation, etc.)
-- **Verify**: Ensure the work meets the task requirements
+- **Verify**: Ensure the work meets the issue requirements
 - **Complete**: Mark as finished only when truly done
 
 ### 4. Interactive Continuation
 
-After the task processing loop exits (no more pending tasks), the agent MUST interactively ask the user whether to continue before generating the completion report:
+After the issue processing loop exits (no more pending issues), the agent MUST interactively ask the user whether to continue before generating the completion report:
 
 ```
 PRESENT interactive selection to user:
-    question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?"
+    question = "Project '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?"
     choices  = [
-        "Continue current queue (re-check for newly added pending tasks)",
-        "Switch to another queue (call queue_list to select a new queue)",
+        "Continue current project (re-check for newly added pending issues)",
+        "Switch to another project (call project_list to select a new project)",
         "No, done — print final report"
     ]
 
-IF user selects "Continue current queue":
-    GOTO Task Processing Loop (re-check for new pending tasks in same queue_id)
+IF user selects "Continue current project":
+    GOTO Issue Processing Loop (re-check for new pending issues in same queue_id)
 
-IF user selects "Switch to another queue":
-    queue_list()  # Show all queues for user to pick next queue
-    GOTO Initialization Phase with new queue_name
+IF user selects "Switch to another project":
+    project_list()  # Show all projects for user to pick next project
+    GOTO Initialization Phase with new project_name
 
 IF user selects "No, done":
     CONTINUE to Completion Report
 ```
 
 **Key requirements**:
-- This prompt MUST appear after every queue is fully drained, before the final report
+- This prompt MUST appear after every project is fully drained, before the final report
 - The agent must NOT silently exit — always pause and wait for user input
-- "Continue current queue" is preferred over "Switch queue" because new tasks may have been added while the agent was processing
+- "Continue current project" is preferred over "Switch project" because new issues may have been added while the agent was processing
 
 ### 5. Completion Report
 
 After the user confirms they are done (or selects to stop), provide:
-- Number of tasks processed
-- List of completed tasks with brief summaries
+- Number of issues processed
+- List of completed issues with brief summaries
 - Any errors or warnings encountered
 
 ## Ordering Rules
 
-Tasks are processed in this order:
+Issues are processed in this order:
 1. **Higher priority first** - `priority` field (descending)
 2. **Earlier position first** - `position` field (ascending) - for tie-breaking
 
-Example: Task A (priority=10, position=2) runs before Task B (priority=5, position=1)
+Example: Issue A (priority=10, position=2) runs before Issue B (priority=5, position=1)
 
 ## Error Handling
 
-- If a task cannot be completed:
+- If an issue cannot be completed:
   1. Document the error clearly
-  2. Keep the task in "doing" status (do not mark as finished)
-  3. Continue to the next pending task
-  4. Report all failed tasks at the end
+  2. Keep the issue in "doing" status (do not mark as finished)
+  3. Continue to the next pending issue
+  4. Report all failed issues at the end
 
 - If the MCP server is unavailable:
   1. Report connection error
@@ -145,13 +145,13 @@ The following tools are available to AI agents in readonly mode:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
-| `queue_list` | List all queues | (none) |
-| `task_list` | List tasks in queue | `queue_id`, `status?` |
-| `task_update` | Update task status | `task_id`, `status` |
+| `project_list` | List all projects | (none) |
+| `issue_list` | List tasks in queue | `queue_id`, `status?` |
+| `issue_update` | Update task status | `task_id`, `status` |
 
-> **Admin Tools**: `queue_create`, `queue_delete`, `task_create`, `task_delete`, `task_prioritize` are only available when readonly mode is disabled (`-readonly=false`). Use the Web UI or REST API for queue/task management.
+> **Admin Tools**: `project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize` are only available when readonly mode is disabled (`-readonly=false`). Use the Web UI or REST API for project/issue management.
 
-## Task Status Values
+## Issue Status Values
 
 | Status | Meaning |
 |--------|---------|
@@ -162,47 +162,47 @@ The following tools are available to AI agents in readonly mode:
 ## Example Invocation
 
 **User:**
-> Process all tasks in queue "daily-tasks"
+> Process all issues in project "daily-tasks"
 
 **Agent Response:**
 ```
-Found queue "daily-tasks" (id: 3)
+Found project "daily-tasks" (id: 3)
 
-Processing task #15: "Review PR #42" (priority: 10)
+Processing issue #15: "Review PR #42" (priority: 10)
   → Marked as doing
   → Reviewed pull request, left comments
   → Marked as finished
 
-Processing task #16: "Update documentation" (priority: 5)
+Processing issue #16: "Update documentation" (priority: 5)
   → Marked as doing
   → Updated README and API docs
   → Marked as finished
 
-Processing task #17: "Run tests" (priority: 5)
+Processing issue #17: "Run tests" (priority: 5)
   → Marked as doing
   → All tests passed
   → Marked as finished
 
-No more pending tasks.
+No more pending issues.
 
 [Interactive prompt]
-Queue "daily-tasks" (id: 3) is fully processed. Continue with the current queue?
-> 1. Continue current queue (re-check for newly added pending tasks)
-> 2. Switch to another queue (call queue_list to select a new queue)
+Project "daily-tasks" (id: 3) is fully processed. Continue with the current project?
+> 1. Continue current project (re-check for newly added pending issues)
+> 2. Switch to another project (call project_list to select a new project)
 > 3. No, done — print final report
 
 [User selects: No, done]
 
 Summary:
-- Processed: 3 tasks
-- Completed: 3 tasks
-- Failed: 0 tasks
+- Processed: 3 issues
+- Completed: 3 issues
+- Failed: 0 issues
 ```
 
 ## Constraints
 
-1. **Single-threaded**: Process one task at a time, never in parallel
-2. **No skipping**: Every pending task must be attempted
+1. **Single-threaded**: Process one issue at a time, never in parallel
+2. **No skipping**: Every pending issue must be attempted
 3. **Honest status**: Only mark "finished" when truly complete
-4. **Persistent**: Continue until all tasks are done or unrecoverable error
+4. **Persistent**: Continue until all issues are done or unrecoverable error
 5. **Interactive continuation**: Always pause and ask the user before exiting; never auto-terminate silently

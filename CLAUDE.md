@@ -5,9 +5,9 @@ A Go-based MCP (Model Context Protocol) Server that manages multiple Issue Kanba
 ## Project Overview
 
 This is an MCP server implementation in Go that provides:
-- **MCP Tools**: 3 readonly tools + 5 admin tools for queue and task management
-- **MCP Resources**: 4 resources for reading queue/task data
-- **REST API**: Full CRUD API for queues and tasks
+- **MCP Tools**: 3 readonly tools + 5 admin tools for project and issue management
+- **MCP Resources**: 4 resources for reading project/issue data
+- **REST API**: Full CRUD API for projects and issues
 - **Web UI**: Embedded single-page application for visual management
 - **SQLite Storage**: Persistent data storage
 
@@ -50,7 +50,7 @@ internal/
 │   ├── tools.go            # 8 MCP tools
 │   └── resources.go        # 4 MCP resources
 ├── queue/                  # Business logic layer
-│   ├── manager.go          # Queue manager
+│   ├── manager.go          # Project manager
 │   ├── models.go           # Data models
 │   └── mock_storage.go     # Mock storage for testing
 ├── storage/sqlite.go       # SQLite persistence
@@ -67,32 +67,32 @@ internal/
 
 | Tool | Description |
 |------|-------------|
-| `queue_list` | List all queues with stats |
-| `task_list` | List tasks in a queue |
-| `task_update` | Update task status |
+| `project_list` | List all projects with stats |
+| `issue_list` | List issues in a project |
+| `issue_update` | Update issue status |
 
 ### Admin Tools (require `-readonly=false`)
 
 | Tool | Description |
 |------|-------------|
-| `queue_create` | Create a new queue |
-| `queue_delete` | Delete a queue |
-| `task_create` | Create a new task |
-| `task_delete` | Delete a task |
-| `task_prioritize` | Move task to front (jump queue) |
+| `project_create` | Create a new project |
+| `project_delete` | Delete a project |
+| `issue_create` | Create a new issue |
+| `issue_delete` | Delete an issue |
+| `issue_prioritize` | Move issue to front (插队) |
 
 ## MCP Resources
 
 | URI | Description |
 |-----|-------------|
-| `queue://list` | List all queues |
-| `queue://{id}` | Get queue details |
-| `queue://{id}/tasks` | Get queue tasks |
-| `task://{id}` | Get task details |
+| `project://list` | List all projects |
+| `project://{id}` | Get project details |
+| `project://{id}/issues` | Get project issues |
+| `issue://{id}` | Get issue details |
 
-## Task Status
+## Issue Status
 
-Tasks have three states:
+Issues have three states:
 - `pending` - Waiting to be processed
 - `doing` - Currently being processed
 - `finished` - Completed
@@ -103,7 +103,7 @@ A bubbletea-based terminal UI that mirrors the Web UI functionality.
 
 ```bash
 # Start TUI (server must be running)
-./bin/task-queue-tui --server http://localhost:9292
+./bin/issue-kanban-tui --server http://localhost:9292
 
 # Build TUI
 make build-tui
@@ -113,11 +113,11 @@ make build-tui
 | Key | Action |
 |-----|--------|
 | `j`/`k` or `↑`/`↓` | Navigate list |
-| `Enter` | Open queue |
-| `n` | New queue / task |
-| `e` | Edit selected task (pending only) |
+| `Enter` | Open project |
+| `n` | New project / issue |
+| `e` | Edit selected issue (pending only) |
 | `d` | Delete selected |
-| `p` | Prioritize task (move to front) |
+| `p` | Prioritize issue (move to front) |
 | `R` | Manual refresh |
 | `Esc` / `q` | Back / quit |
 
@@ -130,33 +130,33 @@ A cobra-based command-line interface for scripting and automation.
 make build-cli
 
 # Usage
-./bin/task-queue-cli --server http://localhost:9292 queues list
-./bin/task-queue-cli queues create --name "my-queue" --desc "description"
-./bin/task-queue-cli queues delete <id>
-./bin/task-queue-cli queues stats <id>
+./bin/issue-kanban-cli --server http://localhost:9292 projects list
+./bin/issue-kanban-cli projects create --name "my-project" --desc "description"
+./bin/issue-kanban-cli projects delete <id>
+./bin/issue-kanban-cli projects stats <id>
 
-./bin/task-queue-cli tasks list <queue-id> [--status pending|doing|finished]
-./bin/task-queue-cli tasks get <id>
-./bin/task-queue-cli tasks create <queue-id> --title "task" [--desc "..."] [--priority 0]
-./bin/task-queue-cli tasks edit <id> [--title "new title"] [--desc "new desc"] [--priority 1]
-./bin/task-queue-cli tasks delete <id> [--yes]
-./bin/task-queue-cli tasks prioritize <id>
+./bin/issue-kanban-cli issues list <project-id> [--status pending|doing|finished]
+./bin/issue-kanban-cli issues get <id>
+./bin/issue-kanban-cli issues create <project-id> --title "issue" [--desc "..."] [--priority 0]
+./bin/issue-kanban-cli issues edit <id> [--title "new title"] [--desc "new desc"] [--priority 1]
+./bin/issue-kanban-cli issues delete <id> [--yes]
+./bin/issue-kanban-cli issues prioritize <id>
 ```
 
 ## Running Modes
 
 ```bash
 # HTTP mode (Web UI + REST API + MCP SSE) - readonly by default
-./bin/task-queue-mcp -port=9292 -mcp=http
+./bin/issue-kanban-mcp -port=9292 -mcp=http
 
 # STDIO mode (for MCP clients like Claude) - readonly by default
-./bin/task-queue-mcp -mcp=stdio
+./bin/issue-kanban-mcp -mcp=stdio
 
 # Both modes
-./bin/task-queue-mcp -port=9292 -mcp=both
+./bin/issue-kanban-mcp -port=9292 -mcp=both
 
 # Admin mode (full access to all MCP tools)
-./bin/task-queue-mcp -readonly=false
+./bin/issue-kanban-mcp -readonly=false
 ```
 
 > **Note**: Readonly mode is enabled by default for AI safety. Use `-readonly=false` or `MCP_READONLY=false` for admin access.
@@ -191,7 +191,7 @@ make e2e-quick
 
 CLI tests live in `cmd/cli/main_test.go` and use `net/http/httptest.NewServer` to spin up a mock REST API server for each test case. This means:
 - Tests run without a real server or database
-- Every subcommand (`queues list/create/delete/stats`, `tasks list/get/create/edit/delete/prioritize`) has a dedicated test
+- Every subcommand (`projects list/create/delete/stats`, `issues list/get/create/edit/delete/prioritize`) has a dedicated test
 - Tests verify both output text and HTTP method/path correctness
 - The `runCmd(t, ts, ...)` helper wires the CLI to the mock server via `--server` flag
 
@@ -205,21 +205,21 @@ make build  # Uses CGO_ENABLED=0
 
 ## API Endpoints
 
-### Queues
-- `GET /api/queues` - List all queues
-- `POST /api/queues` - Create queue
-- `GET /api/queues/{id}` - Get queue
-- `DELETE /api/queues/{id}` - Delete queue
-- `GET /api/queues/{id}/tasks` - Get queue tasks
-- `GET /api/queues/{id}/stats` - Get queue stats
+### Projects
+- `GET /api/projects` - List all projects
+- `POST /api/projects` - Create project
+- `GET /api/projects/{id}` - Get project
+- `DELETE /api/projects/{id}` - Delete project
+- `GET /api/projects/{id}/issues` - Get project issues
+- `GET /api/projects/{id}/stats` - Get project stats
 
-### Tasks
-- `POST /api/tasks` - Create task
-- `GET /api/tasks/{id}` - Get task
-- `PATCH /api/tasks/{id}` - Update task **status** (pending/doing/finished) — used by MCP
-- `PUT /api/tasks/{id}` - Edit task content (title/description/priority, pending only)
-- `DELETE /api/tasks/{id}` - Delete task
-- `POST /api/tasks/{id}/prioritize` - Prioritize task (jump queue)
+### Issues
+- `POST /api/issues` - Create issue
+- `GET /api/issues/{id}` - Get issue
+- `PATCH /api/issues/{id}` - Update issue **status** (pending/doing/finished) — used by MCP
+- `PUT /api/issues/{id}` - Edit issue content (title/description/priority, pending only)
+- `DELETE /api/issues/{id}` - Delete issue
+- `POST /api/issues/{id}/prioritize` - Prioritize issue (插队)
 
 ## Key Dependencies
 
@@ -240,96 +240,96 @@ make build  # Uses CGO_ENABLED=0
 
 When asked to process an issue kanban using this MCP server, follow the workflow below.
 
-### Step 1: Identify the Queue
+### Step 1: Identify the Project
 
-Use `queue_list` to find the target queue by name:
+Use `project_list` to find the target project by name:
 
 ```
-queue_list -> find queue with matching name -> get queue_id
+project_list -> find project with matching name -> get queue_id
 ```
 
-If the queue doesn't exist, report an error and stop.
+If the project doesn't exist, report an error and stop.
 
-### Step 2: Process Tasks in Loop
+### Step 2: Process Issues in Loop
 
-Repeat until all tasks are finished:
+Repeat until all issues are finished:
 
-1. **Get pending tasks** using `task_list`:
+1. **Get pending issues** using `issue_list`:
    ```
-   task_list(queue_id=<queue_id>) -> returns tasks sorted by priority DESC, position ASC
-   ```
-
-2. **Check for pending tasks**:
-   - If no pending tasks remain, exit the loop (done!)
-
-3. **Pick the next task** (first in the sorted list - highest priority, earliest position)
-
-4. **Start the task** using `task_update`:
-   ```
-   task_update(task_id=<task_id>, status="doing")
+   issue_list(queue_id=<queue_id>) -> returns issues sorted by priority DESC, position ASC
    ```
 
-5. **Execute the task**:
-   - Read the task `title` and `description`
-   - Perform the work described in the task
+2. **Check for pending issues**:
+   - If no pending issues remain, exit the loop (done!)
+
+3. **Pick the next issue** (first in the sorted list - highest priority, earliest position)
+
+4. **Start the issue** using `issue_update`:
+   ```
+   issue_update(task_id=<task_id>, status="doing")
+   ```
+
+5. **Execute the issue**:
+   - Read the issue `title` and `description`
+   - Perform the work described in the issue
    - This is the actual work you need to do (coding, analysis, writing, etc.)
 
-6. **Finish the task** using `task_update`:
+6. **Finish the issue** using `issue_update`:
    ```
-   task_update(task_id=<task_id>, status="finished")
+   issue_update(task_id=<task_id>, status="finished")
    ```
 
 7. **Loop back** to step 2
 
 ### Step 3: Interactive Continuation
 
-When the loop exits (no more pending tasks in the current queue), **do NOT immediately print the completion report**. Instead, use the `ask_user` tool to present an interactive selection:
+When the loop exits (no more pending issues in the current project), **do NOT immediately print the completion report**. Instead, use the `ask_user` tool to present an interactive selection:
 
 ```
 ask_user(
-  question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
+  question = "Project '{project_name}' (id={project_id}) is fully processed. Continue with the current project?",
   choices  = [
-    "Continue current queue (re-check for newly added pending tasks)",
-    "Switch to another queue",
+    "Continue current project (re-check for newly added pending issues)",
+    "Switch to another project",
     "No, done — print final report"
   ]
 )
 ```
 
-- If user selects **"Continue current queue"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
-- If user selects **"Switch to another queue"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
+- If user selects **"Continue current project"**: loop back to Step 2 with the same `queue_id` (new issues may have been added).
+- If user selects **"Switch to another project"**: call `project_list`, let the user pick a new project, then restart from Step 1 with the new project name.
 - If user selects **"No, done"**: proceed to Step 4.
 
 ### Step 4: Completion
 
 When the user confirms they are done, report:
-- Total tasks processed (across all queues in this session)
-- Summary of work completed per queue
+- Total issues processed (across all projects in this session)
+- Summary of work completed per project
 
 ### Important Rules
 
-1. **Process one task at a time** - Do not batch process multiple tasks
-2. **Respect priority order** - Higher priority tasks must be done first
+1. **Process one issue at a time** - Do not batch process multiple issues
+2. **Respect priority order** - Higher priority issues must be done first
 3. **Respect position order** - For same priority, earlier positions go first
-4. **Always update status** - Mark tasks as "doing" before work, "finished" after
-5. **Handle errors gracefully** - If a task fails, report the error but continue with the next task
-6. **Never skip tasks** - Process all pending tasks until the queue is empty
-7. **Interactive continuation** - After a queue is fully drained, always use `ask_user` to prompt before exiting; never terminate silently
+4. **Always update status** - Mark issues as "doing" before work, "finished" after
+5. **Handle errors gracefully** - If an issue fails, report the error but continue with the next issue
+6. **Never skip issues** - Process all pending issues until the project is empty
+7. **Interactive continuation** - After a project is fully drained, always use `ask_user` to prompt before exiting; never terminate silently
 
 ### MCP Tools Reference
 
 | Tool | Purpose |
 |------|---------|
-| `queue_list` | List all queues to find target by name |
-| `task_list` | Get tasks in a queue (with optional status filter) |
-| `task_update` | Change task status (pending → doing → finished) |
+| `project_list` | List all projects to find target by name |
+| `issue_list` | Get issues in a project (with optional status filter) |
+| `issue_update` | Change issue status (pending → doing → finished) |
 
-### Task Status Flow
+### Issue Status Flow
 
 ```
 pending → doing → finished
 ```
 
-- `pending`: Task is waiting to be processed
-- `doing`: Task is currently being worked on
-- `finished`: Task is complete
+- `pending`: Issue is waiting to be processed
+- `doing`: Issue is currently being worked on
+- `finished`: Issue is complete

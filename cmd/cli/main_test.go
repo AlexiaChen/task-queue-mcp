@@ -50,7 +50,7 @@ func runCmd(t *testing.T, ts *httptest.Server, args ...string) (string, error) {
 
 func TestQueuesList(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/queues" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/projects" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]apiclient.QueueWithStats{mockQueue})
 			return
@@ -59,7 +59,7 @@ func TestQueuesList(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "queues", "list")
+	out, err := runCmd(t, ts, "projects", "list")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,7 +73,7 @@ func TestQueuesList(t *testing.T) {
 
 func TestQueuesCreate(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/queues" {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/projects" {
 			var input queue.CreateQueueInput
 			json.NewDecoder(r.Body).Decode(&input)
 			q := queue.Queue{ID: 99, Name: input.Name, Description: input.Description}
@@ -86,18 +86,18 @@ func TestQueuesCreate(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "queues", "create", "--name", "New Queue", "--desc", "desc")
+	out, err := runCmd(t, ts, "projects", "create", "--name", "New Queue", "--desc", "desc")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Created queue") {
-		t.Errorf("expected 'Created queue' in output, got:\n%s", out)
+	if !strings.Contains(out, "Created project") {
+		t.Errorf("expected 'Created project' in output, got:\n%s", out)
 	}
 }
 
 func TestQueuesStats(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/queues/1/stats" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/projects/1/stats" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(mockQueue.Stats)
 			return
@@ -106,7 +106,7 @@ func TestQueuesStats(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "queues", "stats", "1")
+	out, err := runCmd(t, ts, "projects", "stats", "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -117,7 +117,7 @@ func TestQueuesStats(t *testing.T) {
 
 func TestQueuesDelete(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete && r.URL.Path == "/api/queues/1" {
+		if r.Method == http.MethodDelete && r.URL.Path == "/api/projects/1" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -125,18 +125,18 @@ func TestQueuesDelete(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "queues", "delete", "--yes", "1")
+	out, err := runCmd(t, ts, "projects", "delete", "--yes", "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Deleted queue") {
-		t.Errorf("expected 'Deleted queue' in output, got:\n%s", out)
+	if !strings.Contains(out, "Deleted project") {
+		t.Errorf("expected 'Deleted project' in output, got:\n%s", out)
 	}
 }
 
 func TestTasksList(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/queues/1/tasks" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/projects/1/issues" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode([]queue.Task{mockTask})
 			return
@@ -145,7 +145,7 @@ func TestTasksList(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "list", "1")
+	out, err := runCmd(t, ts, "issues", "list", "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -156,7 +156,7 @@ func TestTasksList(t *testing.T) {
 
 func TestTasksListWithStatusFilter(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/queues/1/tasks" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/projects/1/issues" {
 			if r.URL.Query().Get("status") != "pending" {
 				http.Error(w, "expected status=pending", http.StatusBadRequest)
 				return
@@ -169,7 +169,7 @@ func TestTasksListWithStatusFilter(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := runCmd(t, ts, "tasks", "list", "--status", "pending", "1")
+	_, err := runCmd(t, ts, "issues", "list", "--status", "pending", "1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestTasksListWithStatusFilter(t *testing.T) {
 
 func TestTasksGet(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == "/api/tasks/10" {
+		if r.Method == http.MethodGet && r.URL.Path == "/api/issues/10" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(mockTask)
 			return
@@ -186,7 +186,7 @@ func TestTasksGet(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "get", "10")
+	out, err := runCmd(t, ts, "issues", "get", "10")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -197,7 +197,7 @@ func TestTasksGet(t *testing.T) {
 
 func TestTasksCreate(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/tasks" {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/issues" {
 			var input queue.CreateTaskInput
 			json.NewDecoder(r.Body).Decode(&input)
 			t := queue.Task{ID: 42, QueueID: input.QueueID, Title: input.Title, Status: queue.StatusPending}
@@ -210,12 +210,12 @@ func TestTasksCreate(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "create", "1", "--title", "New Task")
+	out, err := runCmd(t, ts, "issues", "create", "1", "--title", "New Task")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Created task") {
-		t.Errorf("expected 'Created task', got:\n%s", out)
+	if !strings.Contains(out, "Created issue") {
+		t.Errorf("expected 'Created issue', got:\n%s", out)
 	}
 }
 
@@ -223,7 +223,7 @@ func TestTasksEdit(t *testing.T) {
 	edited := mockTask
 	edited.Title = "Updated Title"
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPut && r.URL.Path == "/api/tasks/10" {
+		if r.Method == http.MethodPut && r.URL.Path == "/api/issues/10" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(edited)
 			return
@@ -232,7 +232,7 @@ func TestTasksEdit(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "edit", "10", "--title", "Updated Title")
+	out, err := runCmd(t, ts, "issues", "edit", "10", "--title", "Updated Title")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestTasksEdit(t *testing.T) {
 
 func TestTasksDelete(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodDelete && r.URL.Path == "/api/tasks/10" {
+		if r.Method == http.MethodDelete && r.URL.Path == "/api/issues/10" {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
@@ -251,18 +251,18 @@ func TestTasksDelete(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "delete", "--yes", "10")
+	out, err := runCmd(t, ts, "issues", "delete", "--yes", "10")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(out, "Deleted task") {
-		t.Errorf("expected 'Deleted task', got:\n%s", out)
+	if !strings.Contains(out, "Deleted issue") {
+		t.Errorf("expected 'Deleted issue', got:\n%s", out)
 	}
 }
 
 func TestTasksPrioritize(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && r.URL.Path == "/api/tasks/10/prioritize" {
+		if r.Method == http.MethodPost && r.URL.Path == "/api/issues/10/prioritize" {
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(mockTask)
 			return
@@ -271,7 +271,7 @@ func TestTasksPrioritize(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := runCmd(t, ts, "tasks", "prioritize", "10")
+	out, err := runCmd(t, ts, "issues", "prioritize", "10")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -288,7 +288,7 @@ func TestServerError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := runCmd(t, ts, "queues", "stats", "999")
+	_, err := runCmd(t, ts, "projects", "stats", "999")
 	if err == nil {
 		t.Fatal("expected error for not found, got nil")
 	}

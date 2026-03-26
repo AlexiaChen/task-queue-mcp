@@ -54,7 +54,7 @@ func main() {
 		// STDIO-only mode for MCP clients
 		log.Println("Starting MCP server in STDIO mode...")
 		if *readonly {
-			log.Println("Readonly mode enabled - only queue_list, task_list, task_update tools exposed")
+			log.Println("Readonly mode enabled - only project_list, issue_list, issue_update tools exposed")
 		}
 		if err := server.ServeStdio(mcpServer.GetMCPServer()); err != nil {
 			log.Fatalf("Server error: %v", err)
@@ -120,7 +120,7 @@ func main() {
 		log.Printf("Web UI: http://localhost%s", httpAddr)
 		log.Printf("MCP SSE: http://localhost%s/sse", httpAddr)
 		if *readonly {
-			log.Println("Readonly mode enabled - only queue_list, task_list, task_update tools exposed")
+			log.Println("Readonly mode enabled - only project_list, issue_list, issue_update tools exposed")
 		}
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)

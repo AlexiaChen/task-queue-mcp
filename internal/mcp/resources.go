@@ -16,42 +16,42 @@ func (s *Server) registerResources() error {
 	// Static resource: list all queues
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"queue://list",
-			"All Queues",
-			mcplib.WithResourceDescription("List all task queues"),
+			"project://list",
+			"All Projects",
+			mcplib.WithResourceDescription("List all projects"),
 			mcplib.WithMIMEType("application/json"),
 		),
 		s.handleQueueListResource,
 	)
 
-	// Dynamic resource: get specific queue
+	// Dynamic resource: get specific project
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"queue://{queue_id}",
-			"Queue Details",
-			mcplib.WithResourceDescription("Get details of a specific queue"),
+			"project://{queue_id}",
+			"Project Details",
+			mcplib.WithResourceDescription("Get details of a specific project"),
 			mcplib.WithMIMEType("application/json"),
 		),
 		s.handleQueueResource,
 	)
 
-	// Dynamic resource: get tasks in a queue
+	// Dynamic resource: get issues in a project
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"queue://{queue_id}/tasks",
-			"Queue Tasks",
-			mcplib.WithResourceDescription("Get all tasks in a specific queue"),
+			"project://{queue_id}/issues",
+			"Project Issues",
+			mcplib.WithResourceDescription("Get all issues in a specific project"),
 			mcplib.WithMIMEType("application/json"),
 		),
 		s.handleQueueTasksResource,
 	)
 
-	// Dynamic resource: get specific task
+	// Dynamic resource: get specific issue
 	s.mcp.AddResource(
 		mcplib.NewResource(
-			"task://{task_id}",
-			"Task Details",
-			mcplib.WithResourceDescription("Get details of a specific task"),
+			"issue://{task_id}",
+			"Issue Details",
+			mcplib.WithResourceDescription("Get details of a specific issue"),
 			mcplib.WithMIMEType("application/json"),
 		),
 		s.handleTaskResource,
@@ -194,40 +194,40 @@ func (s *Server) handleTaskResource(ctx context.Context, req mcplib.ReadResource
 // URI extraction helpers
 
 func extractQueueID(uri string) (int64, error) {
-	re := regexp.MustCompile(`queue://(\d+)`)
+	re := regexp.MustCompile(`project://(\d+)`)
 	matches := re.FindStringSubmatch(uri)
 	if len(matches) < 2 {
-		return 0, fmt.Errorf("invalid queue URI format: %s", uri)
+		return 0, fmt.Errorf("invalid project URI format: %s", uri)
 	}
 	id, err := strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid queue ID: %s", matches[1])
+		return 0, fmt.Errorf("invalid project ID: %s", matches[1])
 	}
 	return id, nil
 }
 
 func extractQueueIDFromTasksURI(uri string) (int64, error) {
-	re := regexp.MustCompile(`queue://(\d+)/tasks`)
+	re := regexp.MustCompile(`project://(\d+)/issues`)
 	matches := re.FindStringSubmatch(uri)
 	if len(matches) < 2 {
-		return 0, fmt.Errorf("invalid queue tasks URI format: %s", uri)
+		return 0, fmt.Errorf("invalid project issues URI format: %s", uri)
 	}
 	id, err := strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid queue ID: %s", matches[1])
+		return 0, fmt.Errorf("invalid project ID: %s", matches[1])
 	}
 	return id, nil
 }
 
 func extractTaskID(uri string) (int64, error) {
-	re := regexp.MustCompile(`task://(\d+)`)
+	re := regexp.MustCompile(`issue://(\d+)`)
 	matches := re.FindStringSubmatch(uri)
 	if len(matches) < 2 {
-		return 0, fmt.Errorf("invalid task URI format: %s", uri)
+		return 0, fmt.Errorf("invalid issue URI format: %s", uri)
 	}
 	id, err := strconv.ParseInt(matches[1], 10, 64)
 	if err != nil {
-		return 0, fmt.Errorf("invalid task ID: %s", matches[1])
+		return 0, fmt.Errorf("invalid issue ID: %s", matches[1])
 	}
 	return id, nil
 }

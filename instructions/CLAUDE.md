@@ -1,6 +1,6 @@
 # Issue Kanban Processor Instruction
 
-This instruction guides Claude Code to process tasks from a specified kanban in the Issue Kanban MCP Server until all tasks are completed.
+This instruction guides Claude Code to process issues from a specified project in the Issue Kanban MCP Server until all issues are completed.
 
 ## Prerequisites
 
@@ -9,8 +9,8 @@ Ensure the Issue Kanban MCP Server is configured like below in your Claude Deskt
 ```json
 {
   "mcpServers": {
-    "task-queue": {
-      "command": "/path/to/task-queue-mcp",
+    "issue-kanban": {
+      "command": "/path/to/issue-kanban-mcp",
       "args": ["-mcp=[stdio | http]", "-db=/path/to/tasks.db"]
     }
   }
@@ -21,110 +21,110 @@ Ensure the Issue Kanban MCP Server is configured like below in your Claude Deskt
 
 When asked to process an issue kanban, follow this workflow:
 
-### Step 1: Identify the Queue
+### Step 1: Identify the Project
 
-Use `queue_list` to find the target queue by name:
+Use `project_list` to find the target project by name:
 
 ```
-queue_list -> find queue with matching name -> get queue_id
+project_list -> find project with matching name -> get queue_id
 ```
 
-If the queue doesn't exist, report an error and stop.
+If the project doesn't exist, report an error and stop.
 
-### Step 2: Process Tasks in Loop
+### Step 2: Process Issues in Loop
 
-Repeat until all tasks are finished:
+Repeat until all issues are finished:
 
-1. **Get pending tasks** using `task_list`:
+1. **Get pending issues** using `issue_list`:
    ```
-   task_list(queue_id=<queue_id>) -> returns tasks sorted by priority DESC, position ASC
-   ```
-
-2. **Check for pending tasks**:
-   - If no pending tasks remain, exit the loop (done!)
-
-3. **Pick the next task** (first in the sorted list - highest priority, earliest position)
-
-4. **Start the task** using `task_update`:
-   ```
-   task_update(task_id=<task_id>, status="doing")
+   issue_list(queue_id=<queue_id>) -> returns issues sorted by priority DESC, position ASC
    ```
 
-5. **Execute the task**:
-   - Read the task `title` and `description`
-   - Perform the work described in the task
+2. **Check for pending issues**:
+   - If no pending issues remain, exit the loop (done!)
+
+3. **Pick the next issue** (first in the sorted list - highest priority, earliest position)
+
+4. **Start the issue** using `issue_update`:
+   ```
+   issue_update(task_id=<task_id>, status="doing")
+   ```
+
+5. **Execute the issue**:
+   - Read the issue `title` and `description`
+   - Perform the work described in the issue
    - This is the actual work you need to do (coding, analysis, writing, etc.)
 
-6. **Finish the task** using `task_update`:
+6. **Finish the issue** using `issue_update`:
    ```
-   task_update(task_id=<task_id>, status="finished")
+   issue_update(task_id=<task_id>, status="finished")
    ```
 
 7. **Loop back** to step 2
 
 ### Step 3: Interactive Continuation
 
-When the loop exits (no more pending tasks in the current queue), **do NOT immediately print the completion report**. Instead, use the `ask_user` tool to present an interactive selection:
+When the loop exits (no more pending issues in the current project), **do NOT immediately print the completion report**. Instead, use the `ask_user` tool to present an interactive selection:
 
 ```
 ask_user(
-  question = "Queue '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
+  question = "Project '{queue_name}' (id={queue_id}) is fully processed. Continue with the current queue?",
   choices  = [
-    "Continue current queue (re-check for newly added pending tasks)",
-    "Switch to another queue",
+    "Continue current project (re-check for newly added pending issues)",
+    "Switch to another project",
     "No, done — print final report"
   ]
 )
 ```
 
 - If user selects **"Continue current queue"**: loop back to Step 2 with the same `queue_id` (new tasks may have been added).
-- If user selects **"Switch to another queue"**: call `queue_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
+- If user selects **"Switch to another project"**: call `project_list`, let the user pick a new queue, then restart from Step 1 with the new queue name.
 - If user selects **"No, done"**: proceed to Step 4.
 
 ### Step 4: Completion
 
 When the user confirms they are done, report:
-- Total tasks processed (across all queues in this session)
-- Summary of work completed per queue
+- Total issues processed (across all projects in this session)
+- Summary of work completed per project
 
 ## Important Rules
 
-1. **Process one task at a time** - Do not batch process multiple tasks
-2. **Respect priority order** - Higher priority tasks must be done first
+1. **Process one issue at a time** - Do not batch process multiple issues
+2. **Respect priority order** - Higher priority issues must be done first
 3. **Respect position order** - For same priority, earlier positions go first
-4. **Always update status** - Mark tasks as "doing" before work, "finished" after
-5. **Handle errors gracefully** - If a task fails, report the error but continue with the next task
-6. **Never skip tasks** - Process all pending tasks until the queue is empty
-7. **Interactive continuation** - After a queue is fully drained, always use `ask_user` to prompt before exiting; never terminate silently
+4. **Always update status** - Mark issues as "doing" before work, "finished" after
+5. **Handle errors gracefully** - If an issue fails, report the error but continue with the next issue
+6. **Never skip issues** - Process all pending issues until the project is empty
+7. **Interactive continuation** - After a project is fully drained, always use `ask_user` to prompt before exiting; never terminate silently
 
 ## Example Usage
 
 User prompt:
-> Process all tasks in the "code-review" queue
+> Process all issues in the "code-review" project
 
 Expected behavior:
-1. Find queue named "code-review"
-2. Get all tasks, pick the first pending one
+1. Find project named "code-review"
+2. Get all issues, pick the first pending one
 3. Mark as "doing", do the code review work
 4. Mark as "finished"
-5. Repeat until no pending tasks remain
-    6. **Ask user** (via `ask_user` tool): "Queue 'code-review' (id=N) is fully processed. Continue with the current queue?"
-    7. If user says "Continue current queue" → re-check same queue; if "Switch to another queue" → pick new queue; if no → output final report
+5. Repeat until no pending issues remain
+    6. **Ask user** (via `ask_user` tool): "Project 'code-review' (id=N) is fully processed. Continue with the current project?"
+    7. If user says "Continue current queue" → re-check same queue; if "Switch to another project" → pick new queue; if no → output final report
 
 ## MCP Tools Reference
 
 | Tool | Purpose |
 |------|---------|
-| `queue_list` | List all queues to find target by name |
-| `task_list` | Get tasks in a queue (with optional status filter) |
-| `task_update` | Change task status (pending → doing → finished) |
+| `project_list` | List all projects to find target by name |
+| `issue_list` | Get issues in a project (with optional status filter) |
+| `issue_update` | Change issue status (pending → doing → finished) |
 
-## Task Status Flow
+## Issue Status Flow
 
 ```
 pending → doing → finished
 ```
 
-- `pending`: Task is waiting to be processed
-- `doing`: Task is currently being worked on
-- `finished`: Task is complete
+- `pending`: Issue is waiting to be processed
+- `doing`: Issue is currently being worked on
+- `finished`: Issue is complete

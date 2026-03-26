@@ -353,41 +353,41 @@ func (c *E2EClient) doRequest(method, path string, body interface{}) ([]byte, er
 }
 
 func (c *E2EClient) ListQueues() ([]map[string]interface{}, error) {
-	return c.doArray("GET", "/api/queues", nil)
+	return c.doArray("GET", "/api/projects", nil)
 }
 
 func (c *E2EClient) CreateQueue(data map[string]interface{}) (map[string]interface{}, error) {
-	return c.doObject("POST", "/api/queues", data)
+	return c.doObject("POST", "/api/projects", data)
 }
 
 func (c *E2EClient) GetQueue(id int64) (map[string]interface{}, error) {
-	return c.doObject("GET", fmt.Sprintf("/api/queues/%d", id), nil)
+	return c.doObject("GET", fmt.Sprintf("/api/projects/%d", id), nil)
 }
 
 func (c *E2EClient) DeleteQueue(id int64) error {
-	_, err := c.doObject("DELETE", fmt.Sprintf("/api/queues/%d", id), nil)
+	_, err := c.doObject("DELETE", fmt.Sprintf("/api/projects/%d", id), nil)
 	return err
 }
 
 func (c *E2EClient) CreateTask(data map[string]interface{}) (map[string]interface{}, error) {
-	return c.doObject("POST", "/api/tasks", data)
+	return c.doObject("POST", "/api/issues", data)
 }
 
 func (c *E2EClient) GetTask(id int64) (map[string]interface{}, error) {
-	return c.doObject("GET", fmt.Sprintf("/api/tasks/%d", id), nil)
+	return c.doObject("GET", fmt.Sprintf("/api/issues/%d", id), nil)
 }
 
 func (c *E2EClient) UpdateTask(id int64, data map[string]interface{}) (map[string]interface{}, error) {
-	return c.doObject("PATCH", fmt.Sprintf("/api/tasks/%d", id), data)
+	return c.doObject("PATCH", fmt.Sprintf("/api/issues/%d", id), data)
 }
 
 func (c *E2EClient) DeleteTask(id int64) error {
-	_, err := c.doObject("DELETE", fmt.Sprintf("/api/tasks/%d", id), nil)
+	_, err := c.doObject("DELETE", fmt.Sprintf("/api/issues/%d", id), nil)
 	return err
 }
 
 func (c *E2EClient) ListTasks(queueID int64, status string) ([]map[string]interface{}, error) {
-	path := fmt.Sprintf("/api/queues/%d/tasks", queueID)
+	path := fmt.Sprintf("/api/projects/%d/issues", queueID)
 	if status != "" {
 		path += "?status=" + status
 	}
@@ -395,15 +395,15 @@ func (c *E2EClient) ListTasks(queueID int64, status string) ([]map[string]interf
 }
 
 func (c *E2EClient) StartTask(id int64) (map[string]interface{}, error) {
-	return c.doObject("POST", fmt.Sprintf("/api/tasks/%d/start", id), nil)
+	return c.doObject("POST", fmt.Sprintf("/api/issues/%d/start", id), nil)
 }
 
 func (c *E2EClient) FinishTask(id int64) (map[string]interface{}, error) {
-	return c.doObject("POST", fmt.Sprintf("/api/tasks/%d/finish", id), nil)
+	return c.doObject("POST", fmt.Sprintf("/api/issues/%d/finish", id), nil)
 }
 
 func (c *E2EClient) PrioritizeTask(id int64, position int) (map[string]interface{}, error) {
-	return c.doObject("POST", fmt.Sprintf("/api/tasks/%d/prioritize", id), map[string]interface{}{
+	return c.doObject("POST", fmt.Sprintf("/api/issues/%d/prioritize", id), map[string]interface{}{
 		"position": position,
 	})
 }

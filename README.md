@@ -1,17 +1,17 @@
 # Issue Kanban MCP Server
 
-[![CI](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/ci.yml)
-[![CD](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/cd.yml/badge.svg)](https://github.com/AlexiaChen/task-queue-mcp/actions/workflows/cd.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/AlexiaChen/task-queue-mcp)](https://goreportcard.com/report/github.com/AlexiaChen/task-queue-mcp)
+[![CI](https://github.com/AlexiaChen/issue-kanban-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/AlexiaChen/issue-kanban-mcp/actions/workflows/ci.yml)
+[![CD](https://github.com/AlexiaChen/issue-kanban-mcp/actions/workflows/cd.yml/badge.svg)](https://github.com/AlexiaChen/issue-kanban-mcp/actions/workflows/cd.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/AlexiaChen/issue-kanban-mcp)](https://goreportcard.com/report/github.com/AlexiaChen/issue-kanban-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Go-based MCP (Model Context Protocol) Server that manages multiple Issue Kanbans with Web UI and REST API.
 
 ## Features
 
-- **MCP Tools**: 8 tools for queue and task management
-- **MCP Resources**: 4 resources for reading queue/task data
-- **REST API**: Full CRUD API for queues and tasks
+- **MCP Tools**: 8 tools for project and issue management
+- **MCP Resources**: 4 resources for reading project/issue data
+- **REST API**: Full CRUD API for projects and issues
 - **Web UI**: Embedded single-page application for visual management
 - **SQLite Storage**: Persistent data storage
 - **Multiple Transports**: STDIO and HTTP/SSE support
@@ -39,17 +39,17 @@ make e2e
 Pull the image from GitHub Container Registry:
 
 ```bash
-docker pull ghcr.io/alexiachen/task-queue-mcp:latest
+docker pull ghcr.io/alexiachen/issue-kanban-mcp:latest
 ```
 
 Run with HTTP mode (Web UI + REST API + MCP SSE):
 
 ```bash
 docker run -d \
-  --name task-queue-mcp \
+  --name issue-kanban-mcp \
   -p 9292:9292 \
   -v task-queue-data:/app/data \
-  ghcr.io/alexiachen/task-queue-mcp:latest
+  ghcr.io/alexiachen/issue-kanban-mcp:latest
 ```
 
 Access:
@@ -60,8 +60,8 @@ Access:
 ### From Source
 
 ```bash
-git clone https://github.com/alexiachen/task-queue-mcp.git
-cd task-queue-mcp
+git clone https://github.com/alexiachen/issue-kanban-mcp.git
+cd issue-kanban-mcp
 make build
 ```
 
@@ -70,16 +70,16 @@ make build
 The binary is statically compiled with no dynamic dependencies:
 
 ```bash
-./bin/task-queue-mcp -port=9292 -mcp=http
+./bin/issue-kanban-mcp -port=9292 -mcp=http
 ```
 
 ## Running Modes
 
 | Mode | Command | Description |
 |------|---------|-------------|
-| HTTP | `./bin/task-queue-mcp -mcp=http` | Web UI + REST API + MCP SSE |
-| STDIO | `./bin/task-queue-mcp -mcp=stdio` | For MCP clients like Claude Desktop |
-| Both | `./bin/task-queue-mcp -mcp=both` | Both transports enabled |
+| HTTP | `./bin/issue-kanban-mcp -mcp=http` | Web UI + REST API + MCP SSE |
+| STDIO | `./bin/issue-kanban-mcp -mcp=stdio` | For MCP clients like Claude Desktop |
+| Both | `./bin/issue-kanban-mcp -mcp=both` | Both transports enabled |
 
 ## MCP Integration
 
@@ -92,7 +92,7 @@ For local MCP clients (Claude Desktop, Copilot CLI, etc.), use STDIO mode:
 make build
 
 # Run in STDIO mode
-./bin/task-queue-mcp -mcp=stdio -db=/path/to/tasks.db
+./bin/issue-kanban-mcp -mcp=stdio -db=/path/to/tasks.db
 ```
 
 ### Claude Desktop Configuration
@@ -102,8 +102,8 @@ Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_
 ```json
 {
   "mcpServers": {
-    "task-queue": {
-      "command": "/path/to/task-queue-mcp",
+    "issue-kanban": {
+      "command": "/path/to/issue-kanban-mcp",
       "args": ["-mcp=stdio", "-db=/path/to/tasks.db"]
     }
   }
@@ -119,9 +119,9 @@ Copilot CLI supports MCP servers via `~/.copilot/mcp-config.json`.
 ```json
 {
   "mcpServers": {
-    "task-queue": {
+    "issue-kanban": {
       "type": "stdio",
-      "command": "/path/to/task-queue-mcp",
+      "command": "/path/to/issue-kanban-mcp",
       "args": ["-mcp=stdio", "-db=/path/to/tasks.db"],
       "env": {},
       "tools": ["*"]
@@ -135,7 +135,7 @@ Copilot CLI supports MCP servers via `~/.copilot/mcp-config.json`.
 ```json
 {
   "mcpServers": {
-    "task-queue": {
+    "issue-kanban": {
       "type": "sse",
       "url": "http://localhost:9292/sse",
       "headers": {},
@@ -161,27 +161,27 @@ For more details, see [Copilot CLI MCP Documentation](https://docs.github.com/en
 
 | Tool | Description |
 |------|-------------|
-| `queue_list` | List all queues with stats |
-| `queue_create` | Create a new queue |
-| `queue_delete` | Delete a queue |
-| `task_list` | List tasks in a queue |
-| `task_create` | Create a new task |
-| `task_update` | Update task status |
-| `task_delete` | Delete a task |
-| `task_prioritize` | Move task to front (插队) |
+| `project_list` | List all projects with stats |
+| `project_create` | Create a new project |
+| `project_delete` | Delete a project |
+| `issue_list` | List issues in a project |
+| `issue_create` | Create a new issue |
+| `issue_update` | Update issue status |
+| `issue_delete` | Delete an issue |
+| `issue_prioritize` | Move issue to front (插队) |
 
 ### MCP Resources
 
 | URI | Description |
 |-----|-------------|
-| `queue://list` | List all queues |
-| `queue://{id}` | Get queue details |
-| `queue://{id}/tasks` | Get queue tasks |
-| `task://{id}` | Get task details |
+| `project://list` | List all projects |
+| `project://{id}` | Get project details |
+| `project://{id}/issues` | Get project issues |
+| `issue://{id}` | Get issue details |
 
-## Task Status
+## Issue Status
 
-Tasks have three states:
+Issues have three states:
 
 - `pending` - Waiting to be processed
 - `doing` - Currently being processed
@@ -189,36 +189,36 @@ Tasks have three states:
 
 ## REST API
 
-### Queues
+### Projects
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/queues` | List all queues |
-| POST | `/api/queues` | Create queue |
-| GET | `/api/queues/{id}` | Get queue |
-| DELETE | `/api/queues/{id}` | Delete queue |
-| GET | `/api/queues/{id}/tasks` | Get queue tasks |
-| GET | `/api/queues/{id}/stats` | Get queue stats |
+| GET | `/api/projects` | List all projects |
+| POST | `/api/projects` | Create project |
+| GET | `/api/projects/{id}` | Get project |
+| DELETE | `/api/projects/{id}` | Delete project |
+| GET | `/api/projects/{id}/issues` | Get project issues |
+| GET | `/api/projects/{id}/stats` | Get project stats |
 
-### Tasks
+### Issues
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/tasks` | Create task |
-| GET | `/api/tasks/{id}` | Get task |
-| PATCH | `/api/tasks/{id}` | Update task |
-| DELETE | `/api/tasks/{id}` | Delete task |
-| POST | `/api/tasks/{id}/start` | Start task (pending → doing) |
-| POST | `/api/tasks/{id}/finish` | Finish task (doing → finished) |
-| POST | `/api/tasks/{id}/prioritize` | Prioritize task (插队) |
+| POST | `/api/issues` | Create issue |
+| GET | `/api/issues/{id}` | Get issue |
+| PATCH | `/api/issues/{id}` | Update issue |
+| DELETE | `/api/issues/{id}` | Delete issue |
+| POST | `/api/issues/{id}/start` | Start issue (pending → doing) |
+| POST | `/api/issues/{id}/finish` | Finish issue (doing → finished) |
+| POST | `/api/issues/{id}/prioritize` | Prioritize issue (插队) |
 
 ## Web UI
 
-Open http://localhost:9292 in your browser to access the Web UI for managing queues and tasks visually.
+Open http://localhost:9292 in your browser to access the Web UI for managing projects and issues visually.
 
 ## AI Agent Instructions
 
-The `instructions/` directory contains ready-to-use instructions for AI agents to process tasks from queues automatically.
+The `instructions/` directory contains ready-to-use instructions for AI agents to process issues from projects automatically.
 
 | File | Description |
 |------|-------------|
@@ -227,14 +227,14 @@ The `instructions/` directory contains ready-to-use instructions for AI agents t
 
 ### Usage
 
-Copy the content of `CLAUDE.md` or `AGENTS.md` into your project's instruction file (e.g., `.claude/CLAUDE.md` or `AGENTS.md`). When you ask the AI to "process all tasks in queue X", it will:
+Copy the content of `CLAUDE.md` or `AGENTS.md` into your project's instruction file (e.g., `.claude/CLAUDE.md` or `AGENTS.md`). When you ask the AI to "process all issues in project X", it will:
 
-1. Find the queue by name
-2. Loop through pending tasks (sorted by priority, then position)
-3. For each task: mark as "doing" → execute the work → mark as "finished"
-4. Stop when all tasks are completed
+1. Find the project by name
+2. Loop through pending issues (sorted by priority, then position)
+3. For each issue: mark as "doing" → execute the work → mark as "finished"
+4. Stop when all issues are completed
 
-This enables autonomous task processing where the AI acts as a worker for your task queues.
+This enables autonomous issue processing where the AI acts as a worker for your projects.
 
 ## Project Structure
 
@@ -247,7 +247,7 @@ internal/
 │   ├── tools.go            # 8 MCP tools
 │   └── resources.go        # 4 MCP resources
 ├── queue/                  # Business logic layer
-│   ├── manager.go          # Queue manager
+│   ├── manager.go          # Project manager
 │   ├── models.go           # Data models
 │   └── mock_storage.go     # Mock storage for testing
 ├── storage/sqlite.go       # SQLite persistence
@@ -257,8 +257,8 @@ examples/
 ├── mcp-client/main.go      # SSE client example
 └── stdio-client/main.go    # STDIO client example
 instructions/
-├── CLAUDE.md               # Claude Code task processing instruction
-└── AGENTS.md               # Generic AI agent task processing instruction
+├── CLAUDE.md               # Claude Code issue processing instruction
+└── AGENTS.md               # Generic AI agent issue processing instruction
 ```
 
 ## Configuration

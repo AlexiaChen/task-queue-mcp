@@ -20,23 +20,23 @@ func NewHandler(manager *queue.Manager) *Handler {
 
 // RegisterRoutes registers API routes
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Queue endpoints
-	mux.HandleFunc("GET /api/queues", h.ListQueues)
-	mux.HandleFunc("POST /api/queues", h.CreateQueue)
-	mux.HandleFunc("GET /api/queues/{id}", h.GetQueue)
-	mux.HandleFunc("DELETE /api/queues/{id}", h.DeleteQueue)
-	mux.HandleFunc("GET /api/queues/{id}/tasks", h.GetQueueTasks)
-	mux.HandleFunc("GET /api/queues/{id}/stats", h.GetQueueStats)
+	// Project endpoints
+	mux.HandleFunc("GET /api/projects", h.ListQueues)
+	mux.HandleFunc("POST /api/projects", h.CreateQueue)
+	mux.HandleFunc("GET /api/projects/{id}", h.GetQueue)
+	mux.HandleFunc("DELETE /api/projects/{id}", h.DeleteQueue)
+	mux.HandleFunc("GET /api/projects/{id}/issues", h.GetQueueTasks)
+	mux.HandleFunc("GET /api/projects/{id}/stats", h.GetQueueStats)
 
-	// Task endpoints
-	mux.HandleFunc("POST /api/tasks", h.CreateTask)
-	mux.HandleFunc("GET /api/tasks/{id}", h.GetTask)
-	mux.HandleFunc("PATCH /api/tasks/{id}", h.UpdateTask)
-	mux.HandleFunc("PUT /api/tasks/{id}", h.EditTask)
-	mux.HandleFunc("DELETE /api/tasks/{id}", h.DeleteTask)
-	mux.HandleFunc("POST /api/tasks/{id}/prioritize", h.PrioritizeTask)
-	mux.HandleFunc("POST /api/tasks/{id}/start", h.StartTask)
-	mux.HandleFunc("POST /api/tasks/{id}/finish", h.FinishTask)
+	// Issue endpoints
+	mux.HandleFunc("POST /api/issues", h.CreateTask)
+	mux.HandleFunc("GET /api/issues/{id}", h.GetTask)
+	mux.HandleFunc("PATCH /api/issues/{id}", h.UpdateTask)
+	mux.HandleFunc("PUT /api/issues/{id}", h.EditTask)
+	mux.HandleFunc("DELETE /api/issues/{id}", h.DeleteTask)
+	mux.HandleFunc("POST /api/issues/{id}/prioritize", h.PrioritizeTask)
+	mux.HandleFunc("POST /api/issues/{id}/start", h.StartTask)
+	mux.HandleFunc("POST /api/issues/{id}/finish", h.FinishTask)
 }
 
 // Queue handlers
@@ -85,14 +85,14 @@ func (h *Handler) CreateQueue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetQueue(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid queue ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
 	}
 
 	q, err := h.manager.GetQueue(r.Context(), id)
 	if err != nil {
 		if err == queue.ErrQueueNotFound {
-			h.writeError(w, http.StatusNotFound, "Queue not found")
+			h.writeError(w, http.StatusNotFound, "Project not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -118,13 +118,13 @@ func (h *Handler) GetQueue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteQueue(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid queue ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
 	}
 
 	if err := h.manager.DeleteQueue(r.Context(), id); err != nil {
 		if err == queue.ErrQueueNotFound {
-			h.writeError(w, http.StatusNotFound, "Queue not found")
+			h.writeError(w, http.StatusNotFound, "Project not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -137,7 +137,7 @@ func (h *Handler) DeleteQueue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetQueueTasks(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid queue ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
 	}
 
@@ -159,7 +159,7 @@ func (h *Handler) GetQueueTasks(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetQueueStats(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid queue ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid project ID")
 		return
 	}
 
@@ -193,14 +193,14 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
 	task, err := h.manager.GetTask(r.Context(), id)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -213,7 +213,7 @@ func (h *Handler) GetTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
@@ -226,7 +226,7 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	task, err := h.manager.UpdateTask(r.Context(), id, input)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		if err == queue.ErrInvalidStatus {
@@ -240,11 +240,11 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	h.writeJSON(w, http.StatusOK, task)
 }
 
-// EditTask handles PUT /api/tasks/{id} — updates content fields of a pending task.
+// EditTask handles PUT /api/issues/{id} — updates content fields of a pending issue.
 func (h *Handler) EditTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
@@ -257,7 +257,7 @@ func (h *Handler) EditTask(w http.ResponseWriter, r *http.Request) {
 	task, err := h.manager.EditTask(r.Context(), id, input)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		if err == queue.ErrCannotEditNonPending {
@@ -274,13 +274,13 @@ func (h *Handler) EditTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
 	if err := h.manager.DeleteTask(r.Context(), id); err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -293,7 +293,7 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) PrioritizeTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
@@ -307,7 +307,7 @@ func (h *Handler) PrioritizeTask(w http.ResponseWriter, r *http.Request) {
 	task, err := h.manager.PrioritizeTask(r.Context(), id, input.Position)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -320,14 +320,14 @@ func (h *Handler) PrioritizeTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) StartTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
 	task, err := h.manager.StartTask(r.Context(), id)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
@@ -340,14 +340,14 @@ func (h *Handler) StartTask(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) FinishTask(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 	if err != nil {
-		h.writeError(w, http.StatusBadRequest, "Invalid task ID")
+		h.writeError(w, http.StatusBadRequest, "Invalid issue ID")
 		return
 	}
 
 	task, err := h.manager.FinishTask(r.Context(), id)
 	if err != nil {
 		if err == queue.ErrTaskNotFound {
-			h.writeError(w, http.StatusNotFound, "Task not found")
+			h.writeError(w, http.StatusNotFound, "Issue not found")
 			return
 		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())

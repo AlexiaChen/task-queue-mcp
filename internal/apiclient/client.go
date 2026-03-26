@@ -18,7 +18,7 @@ type QueueWithStats struct {
 	Stats queue.QueueStats `json:"stats"`
 }
 
-// Client communicates with the task-queue-mcp REST API.
+// Client communicates with the issue-kanban-mcp REST API.
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
@@ -82,7 +82,7 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body, resul
 // ListQueues returns all queues with their statistics.
 func (c *Client) ListQueues(ctx context.Context) ([]QueueWithStats, error) {
 	var result []QueueWithStats
-	if err := c.doRequest(ctx, http.MethodGet, "/api/queues", nil, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodGet, "/api/projects", nil, &result); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -91,7 +91,7 @@ func (c *Client) ListQueues(ctx context.Context) ([]QueueWithStats, error) {
 // CreateQueue creates a new queue.
 func (c *Client) CreateQueue(ctx context.Context, input queue.CreateQueueInput) (*queue.Queue, error) {
 	var result queue.Queue
-	if err := c.doRequest(ctx, http.MethodPost, "/api/queues", input, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodPost, "/api/projects", input, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -99,13 +99,13 @@ func (c *Client) CreateQueue(ctx context.Context, input queue.CreateQueueInput) 
 
 // DeleteQueue deletes a queue by ID.
 func (c *Client) DeleteQueue(ctx context.Context, id int64) error {
-	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/queues/%d", id), nil, nil)
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/projects/%d", id), nil, nil)
 }
 
 // GetQueueStats returns statistics for a single queue.
 func (c *Client) GetQueueStats(ctx context.Context, queueID int64) (*queue.QueueStats, error) {
 	var result queue.QueueStats
-	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/queues/%d/stats", queueID), nil, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/projects/%d/stats", queueID), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -113,7 +113,7 @@ func (c *Client) GetQueueStats(ctx context.Context, queueID int64) (*queue.Queue
 
 // ListTasks lists tasks in a queue, optionally filtered by status.
 func (c *Client) ListTasks(ctx context.Context, queueID int64, status string) ([]queue.Task, error) {
-	path := fmt.Sprintf("/api/queues/%d/tasks", queueID)
+	path := fmt.Sprintf("/api/projects/%d/issues", queueID)
 	if status != "" {
 		path += "?status=" + url.QueryEscape(status)
 	}
@@ -127,7 +127,7 @@ func (c *Client) ListTasks(ctx context.Context, queueID int64, status string) ([
 // GetTask returns a task by ID.
 func (c *Client) GetTask(ctx context.Context, id int64) (*queue.Task, error) {
 	var result queue.Task
-	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/tasks/%d", id), nil, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodGet, fmt.Sprintf("/api/issues/%d", id), nil, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -136,7 +136,7 @@ func (c *Client) GetTask(ctx context.Context, id int64) (*queue.Task, error) {
 // CreateTask creates a new task.
 func (c *Client) CreateTask(ctx context.Context, input queue.CreateTaskInput) (*queue.Task, error) {
 	var result queue.Task
-	if err := c.doRequest(ctx, http.MethodPost, "/api/tasks", input, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodPost, "/api/issues", input, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -146,7 +146,7 @@ func (c *Client) CreateTask(ctx context.Context, input queue.CreateTaskInput) (*
 func (c *Client) UpdateTaskStatus(ctx context.Context, id int64, status queue.TaskStatus) (*queue.Task, error) {
 	input := queue.UpdateTaskInput{Status: &status}
 	var result queue.Task
-	if err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/api/tasks/%d", id), input, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodPatch, fmt.Sprintf("/api/issues/%d", id), input, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -156,7 +156,7 @@ func (c *Client) UpdateTaskStatus(ctx context.Context, id int64, status queue.Ta
 func (c *Client) EditTask(ctx context.Context, id int64, title, desc *string, priority *int) (*queue.Task, error) {
 	input := queue.EditTaskInput{Title: title, Description: desc, Priority: priority}
 	var result queue.Task
-	if err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/tasks/%d", id), input, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodPut, fmt.Sprintf("/api/issues/%d", id), input, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
@@ -164,14 +164,14 @@ func (c *Client) EditTask(ctx context.Context, id int64, title, desc *string, pr
 
 // DeleteTask deletes a task by ID.
 func (c *Client) DeleteTask(ctx context.Context, id int64) error {
-	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/tasks/%d", id), nil, nil)
+	return c.doRequest(ctx, http.MethodDelete, fmt.Sprintf("/api/issues/%d", id), nil, nil)
 }
 
 // PrioritizeTask moves a task to the front of its queue.
 func (c *Client) PrioritizeTask(ctx context.Context, id int64) (*queue.Task, error) {
 	body := map[string]int{"position": 1}
 	var result queue.Task
-	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/tasks/%d/prioritize", id), body, &result); err != nil {
+	if err := c.doRequest(ctx, http.MethodPost, fmt.Sprintf("/api/issues/%d/prioritize", id), body, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil
