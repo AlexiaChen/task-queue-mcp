@@ -97,11 +97,11 @@ jobs:
             [ "$os" = "windows" ] && ext=".exe"
             echo "Building $target..."
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
-              -o "release/task-queue-mcp-${target}${ext}" ./cmd/server
+              -o "release/issue-kanban-mcp-${target}${ext}" ./cmd/server
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
-              -o "release/task-queue-tui-${target}${ext}" ./cmd/tui
+              -o "release/issue-kanban-tui-${target}${ext}" ./cmd/tui
             CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags="-s -w" \
-              -o "release/task-queue-cli-${target}${ext}" ./cmd/cli
+              -o "release/issue-kanban-cli-${target}${ext}" ./cmd/cli
           done
           ls -lh release/
 

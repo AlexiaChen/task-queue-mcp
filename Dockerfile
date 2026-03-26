@@ -1,5 +1,9 @@
-# Build stage
-FROM golang:1.25-alpine AS builder
+# syntax=docker/dockerfile:1
+# Build stage — run on the BUILD host platform so Go cross-compiles natively (no QEMU needed)
+FROM --platform=$BUILDPLATFORM golang:1.25-alpine AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
 
 WORKDIR /app
 
@@ -13,8 +17,9 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build binary (CGO_ENABLED=0 for static build, modernc.org/sqlite is pure Go)
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/issue-kanban-mcp ./cmd/server
+# Cross-compile for the target platform without QEMU emulation
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    go build -ldflags="-s -w" -o /app/bin/issue-kanban-mcp ./cmd/server
 
 # Final stage
 FROM alpine:3.19

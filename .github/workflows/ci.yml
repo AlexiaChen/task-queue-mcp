@@ -25,14 +25,14 @@ jobs:
 
       - name: Build all binaries
         run: |
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-mcp ./cmd/server
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-tui ./cmd/tui
-          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-cli ./cmd/cli
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/issue-kanban-mcp ./cmd/server
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/issue-kanban-tui ./cmd/tui
+          CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/issue-kanban-cli ./cmd/cli
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: task-queue-binaries-linux
+          name: issue-kanban-binaries-linux
           path: bin/
           retention-days: 7
 
@@ -79,14 +79,15 @@ jobs:
         run: go mod download
 
       - name: Build binary
-        run: CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-mcp ./cmd/server
+        run: CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/issue-kanban-mcp ./cmd/server
 
       - name: Run e2e tests
         run: |
-          ./bin/task-queue-mcp -db=./data/test.db &
+          ./bin/issue-kanban-mcp -db=./data/test.db &
+          SERVER_PID=$!
           sleep 2
           E2E_SERVER_URL=http://localhost:9292 go test -v ./test/e2e/
-          pkill -f task-queue-mcp || true
+          kill $SERVER_PID || true
 
   example-stdio:
     name: Example STDIO Client
@@ -131,11 +132,12 @@ jobs:
         run: go mod download
 
       - name: Build binary
-        run: CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/task-queue-mcp ./cmd/server
+        run: CGO_ENABLED=0 go build -ldflags="-s -w" -o bin/issue-kanban-mcp ./cmd/server
 
       - name: Run HTTP example
         run: |
-          ./bin/task-queue-mcp -db=./data/example.db -readonly=false &
+          ./bin/issue-kanban-mcp -db=./data/example.db -readonly=false &
+          SERVER_PID=$!
           sleep 2
           timeout 60 go run ./examples/mcp-client/main.go
-          pkill -f task-queue-mcp || true
+          kill $SERVER_PID || true
