@@ -267,7 +267,7 @@ func (a App) handleIssueListKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		a.state = viewCreateTask
 		a.inputs = makeIssueInputs()
 		a.descInput = newDescInput(a.effectiveWidth(), a.height)
-		a.descInput.SetValue("issue 完成后，别忘记遵循CLAUDE.md  AGENTS.md中的issue kanban mcp的指令，循环获取project的issue list")
+		a.descInput.SetValue("")
 		a.focusIdx = 0
 		a.statusMsg = ""
 		cmd := a.inputs[0].Focus()

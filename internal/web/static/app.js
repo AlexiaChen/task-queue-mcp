@@ -336,7 +336,7 @@ function showTaskModal(task = null) {
         </div>
         <div class="form-group">
             <label for="description">Description</label>
-            <textarea id="description" name="description" rows="3">${task ? escapeHtml(task.description || '') : 'issue 完成后，别忘记遵循CLAUDE.md  AGENTS.md中的issue kanban mcp的指令，循环获取project的issue list'}</textarea>
+            <textarea id="description" name="description" rows="3">${task ? escapeHtml(task.description || '') : ''}</textarea>
         </div>
         <div class="form-group">
             <label for="priority">Priority</label>
