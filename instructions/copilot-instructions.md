@@ -46,11 +46,17 @@ cp instructions/copilot-instructions.md ~/.copilot/copilot-instructions.md
 
 ## The Loop
 
+> **IRON RULE: The agent MUST NOT stop or exit without calling `ask_user`.**
+> After every issue is finished, the agent MUST loop back to Step 2.
+> If Step 2 finds no pending issues, the agent MUST reach Step 6 (Drain Gate)
+> which calls `ask_user`. There is NO path from any step to "stop" without
+> an explicit `ask_user` call. Silently stopping is a bug.
+
 ```
-[1. Init] ─── project not found ───► STOP
+[1. Init] ─── project not found ───► STOP (only valid exit without ask_user)
    │
    ▼
-[2. Poll] ─── no pending issues ───► [6. Drain Gate]
+[2. Poll] ─── no pending issues ───► [6. Drain Gate] (MUST call ask_user)
    │
    ▼
 [3. Pre-flight]
@@ -74,11 +80,11 @@ cp instructions/copilot-instructions.md ~/.copilot/copilot-instructions.md
    │         [5c. Compound]
    │            Capture learnings → append to LEARNINGS.md
    │            │
-   │            └──► back to [2]
+   │            └──► MANDATORY: go back to [2] (DO NOT stop here)
    │
-[6. Drain Gate] → re-check / switch project / [7. Report]
+[6. Drain Gate] ─── MANDATORY ask_user ───► re-check / switch project / [7. Report]
    │
-[7. Final Report] ─ include learnings captured this session
+[7. Final Report] ─ include learnings captured this session ─► ask_user before exit
 ```
 
 ---
@@ -117,12 +123,19 @@ existing README). This takes ~30 seconds and saves hours of repeated discovery.
 
 ## Step 2: Poll
 
+> **This step is the loop entry point. The agent MUST always execute this step
+> after finishing an issue (Step 5c). Do NOT skip this step. Do NOT stop.**
+
 ```
 issues  = issue_list(project_id)
 pending = sort(filter(status=="pending"), by=[priority DESC, position ASC])
-if empty → Step 6
+if empty → MUST go to Step 6 (Drain Gate) — call ask_user, do NOT stop silently
 else     → Step 3 with pending[0]
 ```
+
+**Common mistake**: After finishing the last (or only) pending issue, the agent
+stops without looping back here. This is WRONG. The agent MUST return to Step 2,
+discover the empty queue, and proceed to Step 6 where `ask_user` is called.
 
 ---
 
@@ -310,7 +323,11 @@ ask_user(
 If saved → append to `LEARNINGS.md` (create if first time, see Appendix A).
 If skipped → proceed silently. Not every issue produces learnings.
 
-**Then** → Step 2 (next issue).
+**Then** → **MANDATORY: Go back to Step 2 (Poll) immediately.**
+Do NOT stop here. Do NOT assume the work is done just because one issue finished.
+Even if this was the only pending issue, you MUST return to Step 2 so that the
+empty-queue path triggers Step 6 (Drain Gate) which calls `ask_user`.
+The user decides what happens next — not the agent.
 
 ### 5d. Learning Promotion (triggered by match count, not per-issue)
 
@@ -329,16 +346,32 @@ Each promotion is user-gated.
 
 ## Step 6: Drain Gate
 
+> **This step is MANDATORY whenever the pending queue is empty.**
+> The agent MUST call `ask_user` here. Skipping this step is a critical bug.
+> This is the user's control point — they decide whether to re-check, switch,
+> or generate a final report. The agent NEVER decides to stop on its own.
+
 ```
 ask_user(
-  question = "No more pending issues in '<project>'. What next?",
-  choices = ["🔄 Re-check", "🔀 Switch project", "🏁 Final report"]
+  question = "No more pending issues in '<project>'. What would you like to do?",
+  choices = [
+    "🔄 Re-check for new issues",
+    "🔀 Switch to another project",
+    "🏁 Generate final report and finish"
+  ]
 )
 ```
+
+**After user responds:**
+- "Re-check" → `issue_list(project_id)` again → if new pending issues, go to Step 3; if still empty, ask again
+- "Switch project" → `project_list` → ask user to pick → go to Step 2 with new project
+- "Final report" → Step 7
 
 ---
 
 ## Step 7: Final Report
+
+Present the session summary, then MUST call `ask_user` one final time before exiting:
 
 ```
 ## Session Summary
@@ -354,6 +387,19 @@ Project '<name>':
 Follow-ups surfaced:
   - Issue #<id>: <observation>
 ```
+
+```
+ask_user(
+  question = "Session report generated. Anything else?",
+  choices = [
+    "👋 Done for now",
+    "🔄 Continue with another project",
+    "📝 Add notes or follow-up issues"
+  ]
+)
+```
+
+> The agent MUST NOT exit without this final `ask_user` call.
 
 ---
 
@@ -408,7 +454,7 @@ Follow-ups surfaced:
 | 5 | No sycophancy | Reality > wishful thinking |
 | 6 | Ask before unclear work | Fail fast on misunderstanding |
 | 7 | Errors don't cascade | One failure ≠ stopped queue |
-| 8 | No silent exit | Human controls lifecycle |
+| 8 | No silent exit — MUST call `ask_user` before stopping | Human controls lifecycle |
 | 9 | Escalate after 3 rounds | Prevent infinite loops |
 | 10 | Complete > shortcut | AI compression makes it cheap |
 | 11 | Research before coding | Reinventing > checking cost |
