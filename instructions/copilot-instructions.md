@@ -51,6 +51,12 @@ cp instructions/copilot-instructions.md ~/.copilot/copilot-instructions.md
 > If Step 2 finds no pending issues, the agent MUST reach Step 6 (Drain Gate)
 > which calls `ask_user`. There is NO path from any step to "stop" without
 > an explicit `ask_user` call. Silently stopping is a bug.
+>
+> **🚨 REINFORCEMENT: This rule is NON-NEGOTIABLE. Read it again.** 🚨
+> Every code path in the loop MUST terminate at an `ask_user` call.
+> If you are about to generate a final response without `ask_user`, STOP.
+> That is a bug. Go back and find which step you skipped.
+> The user controls the lifecycle — the agent NEVER decides to stop on its own.
 
 ```
 [1. Init] ─── project not found ───► STOP (only valid exit without ask_user)
@@ -60,17 +66,23 @@ cp instructions/copilot-instructions.md ~/.copilot/copilot-instructions.md
    │
    ▼
 [3. Pre-flight]
-   │  Load LEARNINGS.md → match keywords → show relevant learnings
-   │  Unclear requirements? → ask_user → loop until clear
+   │  3a. Load LEARNINGS.md → match keywords → show relevant learnings
+   │  3b. Unclear requirements? → ask_user → loop until clear
+   │  3c. Complexity assessment → simple: proceed / complex: design gate (ask_user)
    │  issue_update(status="doing")
    │
    ▼
 [4. Execute]
-   │  Research codebase first → implement complete solution → atomic commits
+   │  4a. Research codebase first
+   │  4b. TDD: RED-GREEN-REFACTOR (no production code without failing test)
+   │  4c. Implement complete solution (YAGNI — no unneeded features)
+   │  4d. Bug fix? → Systematic debugging (4 phases, root cause first)
+   │  4e. Multi-domain? → Parallel agent dispatch
+   │  4f. Atomic commits
    │
    ▼
 [5. Review → HITL → Compound]
-   │  Two-pass self-review → present to user
+   │  5a. Verification gate → Two-pass self-review → present to user
    │     │
    │     ├── "Improvements needed" → user describes → re-execute → back to [5]
    │     │
@@ -162,8 +174,11 @@ If `LEARNINGS.md` exists in the project root:
 
 Read issue `title` and `description`.
 
-- **Clear** → `issue_update(task_id, status="doing")` → Step 4
+- **Clear** → Step 3c (Complexity Assessment) → Step 4
 - **Ambiguous** → `ask_user` with structured question → re-check → loop until clear
+
+> **🚨 REMINDER: If you need to ask the user anything, you MUST use `ask_user`.
+> Do NOT output a question in plain text and wait. Use the tool. Always.**
 
 **Structured question format** (use everywhere `ask_user` is called):
 1. **Re-ground**: State project, current issue, what you're doing (1 sentence)
@@ -174,6 +189,34 @@ Read issue `title` and `description`.
 > One question at a time. Never bundle. Prefer choices over freeform.
 
 > Ambiguity caught now costs 10 seconds. Caught after execution costs an hour.
+
+### 3c. Complexity Assessment & Design Gate
+
+> **Before diving into code, assess the scope.** Simple issues go straight to
+> execution. Complex issues get a design step — the cost is minutes, the savings
+> are hours of rework.
+
+**Assess the issue complexity:**
+
+| Complexity | Signal | Action |
+|-----------|--------|--------|
+| **Simple** | Single file, clear fix, < 30 min | `issue_update(status="doing")` → Step 4 directly |
+| **Medium** | 2-5 files, clear approach, < 2 hours | Quick design outline (1-2 paragraphs), confirm with user via `ask_user`, then Step 4 |
+| **Complex** | Multiple subsystems, architectural decisions, > 2 hours | Full design gate below |
+
+**Full Design Gate (complex issues only):**
+
+1. **Explore project context** — scan relevant code, docs, recent commits
+2. **Propose 2-3 approaches** — with trade-offs and your recommendation
+3. **Present design** via `ask_user` — get user approval before writing code
+4. **Write a mini-plan** — break into bite-sized tasks (2-5 min each):
+   - Each task: exact file paths, what to change, verification command
+   - Follow TDD: test step → verify fail → implement → verify pass → commit
+5. `issue_update(task_id, status="doing")` → Step 4 with plan
+
+**YAGNI Check:** Before finalizing any design, ruthlessly remove features that
+aren't explicitly required by the issue. "You Aren't Gonna Need It" applies
+to every design decision. Simpler = better. If in doubt, leave it out.
 
 ---
 
@@ -188,12 +231,58 @@ Before writing code:
 
 > Cost of checking: near-zero. Cost of not checking: reinventing something worse.
 
-### 4b. Implement — Complete, Not Quick
+### 4b. TDD Protocol — RED-GREEN-REFACTOR
+
+> **IRON LAW: No production code without a failing test first.**
+> Write code before the test? Delete it. Start over. No exceptions.
+
+For every new function, behavior change, or bug fix:
+
+```
+RED:    Write ONE minimal test showing what SHOULD happen
+        → Run test → Confirm it FAILS (not errors — fails because feature missing)
+
+GREEN:  Write the SIMPLEST code that makes the test pass
+        → Run test → Confirm it PASSES
+        → Run ALL tests → Confirm no regressions
+
+REFACTOR: Clean up (remove duplication, improve names, extract helpers)
+        → Keep ALL tests green
+        → Do NOT add new behavior during refactor
+
+REPEAT: Next failing test for next behavior
+```
+
+**TDD applies to:**
+- New features (always)
+- Bug fixes (write test that reproduces the bug FIRST, then fix)
+- Refactoring (ensure tests cover behavior BEFORE changing structure)
+- Behavior changes (modify test to reflect new behavior, watch it fail, implement)
+
+**TDD exceptions (must be explicit):**
+- Throwaway prototypes (delete before merging)
+- Generated code
+- Pure configuration changes
+
+**Common rationalizations to REJECT:**
+
+| Excuse | Reality |
+|--------|---------|
+| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
+| "I'll test after" | Tests passing immediately prove nothing — you never saw them catch the bug. |
+| "TDD will slow me down" | TDD is faster than debugging. AI compression makes it near-zero cost. |
+| "Need to explore first" | Fine. Throw away exploration, start with TDD. |
+| "Test hard = skip test" | Hard to test = hard to use. Listen to the test — simplify the design. |
+
+### 4c. Implement — Complete, Not Quick (YAGNI)
 
 - Do the work: code, tests, docs, refactor — whatever the issue demands
 - **Always prefer the 100% solution over the 90% shortcut.** With AI, the delta
   costs seconds, not days. A human team takes 1 day to write tests; AI takes 15 min.
   Never defer tests. Never skip edge cases. Completeness is cheap.
+- **YAGNI ruthlessly:** Remove features not explicitly required by the issue.
+  "You Aren't Gonna Need It." Don't add configurable options nobody asked for.
+  Don't build abstractions for hypothetical future use. Simpler = better.
 - Stay within issue scope. Out-of-scope discoveries go in the review, not the code.
 
 **Side-effect tracing** — before marking implementation done, check:
@@ -202,18 +291,85 @@ Before writing code:
 - Can failure leave orphaned state?
 - What other interfaces expose this? (mixins, alternative entry points)
 
-### 4c. Atomic Commits
+### 4d. Systematic Debugging (for bug-fix issues)
+
+> **NO FIXES WITHOUT ROOT CAUSE INVESTIGATION FIRST.**
+> Random fixes waste time and create new bugs. Quick patches mask underlying issues.
+
+When the issue is a bug fix, follow this 4-phase protocol:
+
+**Phase 1 — Root Cause Investigation (MANDATORY before any fix):**
+1. Read error messages carefully — don't skip past them, they often contain the answer
+2. Reproduce consistently — exact steps, every time
+3. Check recent changes — `git diff`, recent commits, new dependencies
+4. Trace data flow — where does the bad value originate? Keep tracing up until source found
+5. In multi-component systems: add diagnostic instrumentation at each boundary BEFORE proposing fixes
+
+**Phase 2 — Pattern Analysis:**
+1. Find working examples of similar code in the codebase
+2. Compare: what's different between working and broken?
+3. List every difference, however small — don't assume "that can't matter"
+
+**Phase 3 — Hypothesis Testing:**
+1. State clearly: "I think X is the root cause because Y"
+2. Make the SMALLEST possible change to test hypothesis — one variable at a time
+3. Verify: worked → Phase 4. Didn't work → new hypothesis, DON'T add more fixes on top
+
+**Phase 4 — Fix Implementation (TDD):**
+1. Write failing test that reproduces the bug (RED)
+2. Implement single fix addressing root cause (GREEN)
+3. Verify: test passes, no regressions
+4. **If fix doesn't work after 3 attempts → STOP. Question the architecture.**
+   Three failed fixes indicate an architectural problem, not a code problem.
+   Escalate to user via `ask_user` before attempting fix #4.
+
+### 4e. Parallel Agent Dispatch (for multi-domain problems)
+
+When an issue involves 2+ independent problem domains (e.g., 3 test files failing
+with different root causes), dispatch parallel agents instead of investigating sequentially:
+
+1. **Identify independent domains** — group by what's broken
+2. **Dispatch focused agents** — each gets: specific scope, clear goal, constraints, expected output
+3. **Review and integrate** — when agents return, verify fixes don't conflict, run full test suite
+
+**Use when:** Independent problems, no shared state between investigations
+**Don't use when:** Failures are related, need full system context, agents would interfere
+
+### 4f. Atomic Commits
 
 Each commit = one logical change:
 - Rename/move separate from behavior changes
-- Tests separate from implementation
+- Tests separate from implementation (TDD naturally produces this)
 - Each independently understandable and revertable
 
 ---
 
 ## Step 5: Review → HITL Gate → Compound
 
-### 5a. Two-Pass Self-Review
+### 5a. Verification Before Completion
+
+> **IRON LAW: No completion claims without fresh verification evidence.**
+> If you haven't run the verification command in THIS step, you cannot claim it passes.
+> Claiming work is complete without verification is dishonesty, not efficiency.
+
+**The Verification Gate (MANDATORY before self-review):**
+```
+1. IDENTIFY: What command proves this works? (test suite, build, linter)
+2. RUN: Execute the FULL command (fresh, not cached)
+3. READ: Full output — check exit code, count failures, scan for warnings
+4. VERIFY: Does output confirm the claim?
+   - YES → State claim WITH evidence (e.g., "47/47 tests pass")
+   - NO  → State actual status with evidence, fix before proceeding
+5. ONLY THEN: Proceed to self-review
+```
+
+**Red flags — STOP if you catch yourself:**
+- Using "should pass", "probably works", "seems correct"
+- Expressing satisfaction before verification ("Great!", "Done!")
+- About to commit without running tests
+- Relying on a previous test run (stale evidence)
+
+**Then proceed to Two-Pass Self-Review:**
 
 **Pass 1 — CRITICAL** (would block a real PR):
 - SQL injection, N+1 queries, race conditions, TOCTOU
@@ -240,6 +396,29 @@ If reasonable engineers could disagree → ASK.
 - Consistency-only changes with no functional impact
 - Issues already addressed in the diff being reviewed
 - Harmless no-ops
+
+### 5a-ii. Receiving Code Review Feedback
+
+When the user provides feedback during improvement rounds, follow this protocol:
+
+**Response pattern — technical evaluation, not emotional performance:**
+1. **READ** complete feedback without reacting
+2. **UNDERSTAND** — restate requirement in own words (or ask via `ask_user`)
+3. **VERIFY** — check against codebase reality before implementing
+4. **EVALUATE** — technically sound for THIS codebase?
+5. **IMPLEMENT** — one item at a time, test each
+
+**FORBIDDEN responses:**
+- ❌ "You're absolutely right!" / "Great point!" / "Thanks for catching that!"
+- ✅ "Fixed. [Brief description of what changed]."
+- ✅ "Good catch — [specific issue]. Fixed in [location]."
+- ✅ Just fix it and show in the code. Actions > words.
+
+**If feedback seems wrong:** Push back with technical reasoning. Reference
+working tests/code. Never blindly implement — verify first.
+
+**If feedback is unclear:** STOP. Do NOT implement partial understanding.
+Ask for clarification on ALL unclear items before starting ANY implementation.
 
 Then present the **structured review**:
 
@@ -276,6 +455,10 @@ Patterns, gotchas, or insights worth capturing for future issues
 > say low. The review reflects reality.
 
 ### 5b. HITL Gate
+
+> **🚨 CRITICAL: This step MUST use `ask_user`. Not a text question. The TOOL.** 🚨
+> If you are about to present the review and then stop, that is a BUG.
+> You MUST call `ask_user` to get the user's decision.
 
 ```
 ask_user(
@@ -329,6 +512,11 @@ Even if this was the only pending issue, you MUST return to Step 2 so that the
 empty-queue path triggers Step 6 (Drain Gate) which calls `ask_user`.
 The user decides what happens next — not the agent.
 
+> **🚨 FINAL REMINDER BEFORE LOOPING: Have you called `ask_user` in this step?** 🚨
+> If the user chose "Save" or "Edit then save" or "Skip" for learnings, that was
+> an `ask_user` call. Good. Now LOOP BACK TO STEP 2. Do NOT generate a final
+> response. Do NOT say "task complete". Go to Step 2 NOW.
+
 ### 5d. Learning Promotion (triggered by match count, not per-issue)
 
 When the agent notices a learning matched ≥ 3 times across issues:
@@ -350,6 +538,12 @@ Each promotion is user-gated.
 > The agent MUST call `ask_user` here. Skipping this step is a critical bug.
 > This is the user's control point — they decide whether to re-check, switch,
 > or generate a final report. The agent NEVER decides to stop on its own.
+>
+> **🚨 SELF-CHECK: Am I about to stop without calling `ask_user`?** 🚨
+> If yes, STOP. That is a bug. Call `ask_user` below. RIGHT NOW.
+> Do NOT rationalize: "I already asked earlier" — THIS step requires its OWN `ask_user`.
+> Do NOT rationalize: "There's nothing to ask" — the choices below ARE the question.
+> Do NOT rationalize: "The user will see my output" — text output ≠ `ask_user` call.
 
 ```
 ask_user(
@@ -463,6 +657,14 @@ ask_user(
 | 14 | No fix without root cause | Symptoms ≠ solutions |
 | 15 | Atomic commits | Independently revertable |
 | 16 | Confirm destructive ops | `rm -rf`, `DROP`, `force-push` |
+| 17 | **TDD: No production code without failing test** | **Tests written after prove nothing — you never saw them catch the bug** |
+| 18 | **YAGNI: Remove features not required** | **Unnecessary complexity is a bug, not a feature** |
+| 19 | **Verify before claiming** | **"Should pass" is not evidence. Run command, read output, THEN claim** |
+| 20 | **3+ failed fixes → question architecture** | **Three failures = architectural problem, not code problem** |
+| 21 | **Parallel agents for independent domains** | **Sequential investigation of independent problems wastes time** |
+| 22 | **Systematic debugging for all bugs** | **Random fixes waste time and create new bugs** |
+| 23 | **Design gate for complex issues** | **Minutes of design save hours of rework** |
+| 24 | **`ask_user` is the ONLY valid exit** | **Every code path terminates at `ask_user`. No exceptions. Ever.** |
 
 ---
 
@@ -576,3 +778,117 @@ for current branch before push/PR transitions. Default-branch safety gate.
 **Voice**: Be concrete — file:line, exact commands, real numbers. Not "there's an
 issue in auth" but "auth.go:47, token check returns nil for expired JWT."
 Not "might be slow" but "N+1 query, ~200ms/page with 50 items."
+
+---
+
+## Appendix D: Meta-Capabilities Reference
+
+> Integrated from the [Superpowers](https://github.com/obra/superpowers) project.
+> These are proven engineering disciplines that the agent applies automatically
+> within the workflow steps above. Listed here for reference and tuning.
+
+### D1. TDD — Test-Driven Development
+
+**Origin:** Superpowers `test-driven-development` skill.
+**Integrated into:** Step 4b.
+
+The RED-GREEN-REFACTOR cycle is non-negotiable for production code. Key insight:
+tests written after code pass immediately — passing immediately proves nothing.
+Test-first forces you to see the test fail, proving it actually tests something.
+
+**Anti-patterns to watch for:**
+- Testing mock behavior instead of real behavior
+- Adding test-only methods to production classes
+- Mocking without understanding dependencies
+- "Keep as reference" — delete means delete
+
+### D2. Systematic Debugging
+
+**Origin:** Superpowers `systematic-debugging` skill.
+**Integrated into:** Step 4d.
+
+4-phase root cause process with supporting techniques:
+- **Root-cause tracing** — trace bugs backward through call stack to find original trigger
+- **Defense in depth** — add validation at multiple layers after finding root cause
+- **Condition-based waiting** — replace arbitrary timeouts with condition polling
+
+Real-world impact: systematic approach = 15-30 min fix. Random fixes = 2-3 hours of thrashing.
+
+### D3. Verification Before Completion
+
+**Origin:** Superpowers `verification-before-completion` skill.
+**Integrated into:** Step 5a.
+
+Evidence before claims, always. From failure memories: "I don't believe you" — trust broken.
+The verification gate prevents false completion claims that waste everyone's time.
+
+### D4. Brainstorming & Design Gate
+
+**Origin:** Superpowers `brainstorming` skill.
+**Integrated into:** Step 3c.
+
+HARD GATE: Do NOT write code without design for complex issues. Every project goes through
+design — "simple" projects are where unexamined assumptions cause the most wasted work.
+The design can be short (a few sentences) but it MUST exist and be approved.
+
+### D5. YAGNI — You Aren't Gonna Need It
+
+**Origin:** Superpowers philosophy, applied across all skills.
+**Integrated into:** Steps 3c, 4c.
+
+Remove unnecessary features from all designs. Don't build abstractions for hypothetical
+future use. Simpler = better. If in doubt, leave it out.
+
+### D6. Subagent-Driven Development
+
+**Origin:** Superpowers `subagent-driven-development` skill.
+**Integrated into:** Step 4e, Appendix C.
+
+Fresh subagent per task + two-stage review (spec compliance, then code quality).
+Key principle: subagents get precisely crafted context, never inherit session history.
+This keeps them focused and preserves the orchestrator's context.
+
+### D7. Code Review Reception
+
+**Origin:** Superpowers `receiving-code-review` skill.
+**Integrated into:** Step 5a-ii.
+
+No performative agreement. Technical rigor always. Verify before implementing.
+Push back with technical reasoning when feedback is wrong. Actions > words.
+
+### D8. Writing Plans
+
+**Origin:** Superpowers `writing-plans` skill.
+**Integrated into:** Step 3c (design gate for complex issues).
+
+Plans assume the engineer has zero context and questionable taste. Every task:
+exact file paths, complete code, verification commands, expected output.
+Bite-sized: 2-5 minutes per step. TDD built into every task.
+
+---
+
+## Appendix E: `ask_user` Compliance Checklist
+
+> **The single most critical operational rule.** This checklist exists because
+> silent exit is the #1 agent failure mode. Read this if you're unsure.
+
+The agent MUST call `ask_user` (the tool, not a text question) at these points:
+
+| Step | When | What to ask |
+|------|------|-------------|
+| 3b | Requirements unclear | Structured clarification question |
+| 3c | Complex issue design | Design approval |
+| 5b | Review complete | "Mark finished" vs "Improvements needed" |
+| 5c | Learnings captured | "Save" / "Edit" / "Skip" |
+| 6 | Queue empty | "Re-check" / "Switch project" / "Final report" |
+| 7 | Session ending | "Done" / "Continue" / "Add notes" |
+
+**Self-test before every response:** "Am I about to stop without `ask_user`?"
+If yes → BUG. Find which step you skipped. Call `ask_user` NOW.
+
+**Common failure modes:**
+- ❌ Presenting a review and stopping (skipped 5b)
+- ❌ Finishing an issue and stopping (skipped Step 2 → 6)
+- ❌ Finding empty queue and stopping (skipped Step 6)
+- ❌ Generating a report and stopping (skipped Step 7)
+- ❌ Asking a question in plain text instead of `ask_user` tool

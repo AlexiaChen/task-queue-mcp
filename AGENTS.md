@@ -147,8 +147,13 @@ make e2e-quick    # e2e against already-running server
 
 - **Business logic**: always go through `queue.Manager`, never call `storage` directly
 - **Testing**: use `queue.NewMockStorage()` — tests must not require a real DB or server
+- **TDD discipline**: RED-GREEN-REFACTOR for all new code. Write failing test first, implement minimal code to pass, refactor. No production code without a failing test. See Step 4b in the playbook.
+- **Systematic debugging**: For any bug fix, follow the 4-phase root cause protocol (Step 4d) before attempting fixes. No random fix-and-check cycles.
+- **Verification before completion**: Run `make test` and verify output BEFORE claiming tests pass. Evidence before claims, always.
+- **YAGNI**: Don't add features, options, or abstractions not required by the current issue. Simpler = better.
 - **Builds**: `CGO_ENABLED=0` for static linking; never add CGO dependencies
 - **CLI tests**: use `net/http/httptest.NewServer` to mock the REST API in `cmd/cli/main_test.go`
+- **No sycophancy in code review**: When receiving feedback, verify against codebase reality before implementing. Push back with technical reasoning if feedback is wrong. No performative agreement.
 
 ---
 
