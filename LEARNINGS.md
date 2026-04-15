@@ -53,3 +53,13 @@
 - **Evidence**: internal/storage/sqlite_triple_test.go — StoreWithSourceMemory test initially failed with CHECK constraint violation
 - **Confidence**: 8/10
 - **Action**: Always set `Importance: 3` (or valid 1-5 value) when creating memory fixtures in tests
+
+---
+
+### L-007: [convention] readonly/admin tool categorization sync (2025-07-15)
+- **Issue**: #39 — 更新MD文件
+- **Trigger**: readonly, admin, tool, mcp, mode
+- **Pattern**: When moving MCP tools between readonly and admin, at least 5 files need updating: tools.go (code), AGENTS.md, README.md, copilot-instructions.md, and design doc. Missing any one creates inconsistency.
+- **Evidence**: Issue #39 required updating all 5 files simultaneously
+- **Confidence**: 9/10
+- **Action**: When changing a tool's readonly/admin status, check ALL doc files referencing tool categorization
