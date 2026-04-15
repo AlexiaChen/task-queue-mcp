@@ -21,3 +21,19 @@
 - **Evidence**: internal/storage/sqlite.go migrations (memories_fts triggers)
 - **Confidence**: 8/10
 - **Action**: When adding FTS5 tables, verify trigger INSERT column list matches CREATE VIRTUAL TABLE column list exactly
+
+### L-003: [gotcha] FTS5 rank column is implicit BM25 — no DDL needed (2026-04-15)
+- **Issue**: #36 — 重新检查记忆模块
+- **Trigger**: fts5, bm25, rank, search, ranking
+- **Pattern**: FTS5's `rank` column IS `bm25()` by default — no DDL/function definition needed. Just SELECT rank FROM fts_table. Negative values, lower = more relevant.
+- **Evidence**: internal/storage/sqlite.go:524 (SELECT rank), SQLite FTS5 docs: "built-in rank column is equivalent to calling bm25()"
+- **Confidence**: 10/10
+- **Action**: When implementing FTS5 search, use `rank` directly in ORDER BY. Document this for team clarity since it's non-obvious.
+
+### L-004: [gotcha] Float64 equality in FTS5 test assertions needs epsilon (2026-04-15)
+- **Issue**: #36 — 重新检查记忆模块
+- **Trigger**: fts5, bm25, float, test, epsilon, rank
+- **Pattern**: BM25 scores for similar-length documents can differ at 1e-15 level even when logically identical. Direct `==` comparison misses tiebreaker validation.
+- **Evidence**: internal/storage/sqlite_memory_test.go:264 (epsilon comparison), initial test used `==` and silently skipped the check
+- **Confidence**: 9/10
+- **Action**: Always use epsilon-based comparison (e.g., `math.Abs(a-b) < 1e-6`) when comparing FTS5 rank values in tests.
