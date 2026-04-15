@@ -8,10 +8,11 @@ import (
 
 // Server wraps the MCP server with queue management
 type Server struct {
-	mcp           *server.MCPServer
-	manager       *queue.Manager
-	memoryManager *memory.MemoryManager
-	readonly      bool
+	mcp            *server.MCPServer
+	manager        *queue.Manager
+	memoryManager  *memory.MemoryManager
+	tripleManager  *memory.TripleManager
+	readonly       bool
 }
 
 // ServerOption is a function that configures the server
@@ -28,6 +29,13 @@ func WithReadonlyMode(readonly bool) ServerOption {
 func WithMemoryManager(mm *memory.MemoryManager) ServerOption {
 	return func(s *Server) {
 		s.memoryManager = mm
+	}
+}
+
+// WithTripleManager configures the server with a triple manager
+func WithTripleManager(tm *memory.TripleManager) ServerOption {
+	return func(s *Server) {
+		s.tripleManager = tm
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	mcplib "github.com/mark3labs/mcp-go/mcp"
 	"github.com/AlexiaChen/issue-kanban-mcp/internal/memory"
@@ -185,6 +186,104 @@ func (s *Server) registerTools() error {
 					mcplib.Description("ID of the memory to delete"),
 				),
 			), s.handleMemoryDelete)
+		}
+	}
+
+	// Triple tools (only if triple manager is configured)
+	if s.tripleManager != nil {
+		// Readonly triple tools
+		s.mcp.AddTool(mcplib.NewTool("triple_query",
+			mcplib.WithDescription("Query knowledge graph triples within a project. Supports filtering by subject/predicate/object (substring match), active-only, and point-in-time queries."),
+			mcplib.WithNumber("project_id",
+				mcplib.Required(),
+				mcplib.Description("ID of the project"),
+			),
+			mcplib.WithString("subject",
+				mcplib.Description("Filter by subject (substring match)"),
+			),
+			mcplib.WithString("predicate",
+				mcplib.Description("Filter by predicate (substring match)"),
+			),
+			mcplib.WithString("object",
+				mcplib.Description("Filter by object (substring match)"),
+			),
+			mcplib.WithBoolean("active_only",
+				mcplib.Description("Only return currently active triples (valid_to IS NULL)"),
+			),
+			mcplib.WithString("point_in_time",
+				mcplib.Description("Return triples valid at this time (RFC3339 format, e.g. 2024-06-01T00:00:00Z)"),
+			),
+			mcplib.WithNumber("limit",
+				mcplib.Description("Maximum number of results (default: 50)"),
+			),
+			mcplib.WithNumber("offset",
+				mcplib.Description("Offset for pagination (default: 0)"),
+			),
+		), s.handleTripleQuery)
+
+		// Admin-only triple tools
+		if !s.readonly {
+			s.mcp.AddTool(mcplib.NewTool("triple_store",
+				mcplib.WithDescription("Store a knowledge graph triple (subject-predicate-object fact) with temporal validity. Use replace_existing=true for single-valued predicates like 'status' or 'assigned_to'."),
+				mcplib.WithNumber("project_id",
+					mcplib.Required(),
+					mcplib.Description("ID of the project"),
+				),
+				mcplib.WithString("subject",
+					mcplib.Required(),
+					mcplib.Description("Entity the triple is about (max 1024 chars)"),
+				),
+				mcplib.WithString("predicate",
+					mcplib.Required(),
+					mcplib.Description("Relationship or property (max 1024 chars)"),
+				),
+				mcplib.WithString("object",
+					mcplib.Required(),
+					mcplib.Description("Value or target entity (max 1024 chars)"),
+				),
+				mcplib.WithString("valid_from",
+					mcplib.Description("When this fact became true (RFC3339, default: now)"),
+				),
+				mcplib.WithString("valid_to",
+					mcplib.Description("When this fact stopped being true (RFC3339, omit for still-active facts)"),
+				),
+				mcplib.WithNumber("confidence",
+					mcplib.Description("Confidence level 0.0-1.0 (default: 1.0)"),
+				),
+				mcplib.WithNumber("source_memory_id",
+					mcplib.Description("Optional ID of the memory this triple was extracted from"),
+				),
+				mcplib.WithBoolean("replace_existing",
+					mcplib.Description("If true, auto-invalidate active triples with same subject+predicate but different object"),
+				),
+			), s.handleTripleStore)
+
+			s.mcp.AddTool(mcplib.NewTool("triple_invalidate",
+				mcplib.WithDescription("Invalidate a triple by setting its valid_to timestamp, marking it as no longer active"),
+				mcplib.WithNumber("project_id",
+					mcplib.Required(),
+					mcplib.Description("ID of the project"),
+				),
+				mcplib.WithNumber("triple_id",
+					mcplib.Required(),
+					mcplib.Description("ID of the triple to invalidate"),
+				),
+				mcplib.WithString("valid_to",
+					mcplib.Description("When the fact stopped being true (RFC3339, default: now)"),
+				),
+			), s.handleTripleInvalidate)
+
+			s.mcp.AddTool(mcplib.NewTool("triple_delete",
+				mcplib.WithDescription("Permanently delete a triple from the knowledge graph"),
+				mcplib.WithNumber("project_id",
+					mcplib.Required(),
+					mcplib.Description("ID of the project"),
+				),
+				mcplib.WithNumber("triple_id",
+					mcplib.Required(),
+					mcplib.Description("ID of the triple to delete"),
+				),
+			), s.handleTripleDelete)
 		}
 	}
 
@@ -490,4 +589,132 @@ func (s *Server) handleMemoryDelete(ctx context.Context, req mcplib.CallToolRequ
 	}
 
 	return mcplib.NewToolResultText(fmt.Sprintf("Memory %d deleted successfully from project %d", memoryID, projectID)), nil
+}
+
+// Triple handlers
+
+func (s *Server) handleTripleQuery(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	projectID, err := req.RequireInt("project_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	opts := memory.QueryTripleOptions{
+		Subject:     req.GetString("subject", ""),
+		Predicate:   req.GetString("predicate", ""),
+		Object:      req.GetString("object", ""),
+		ActiveOnly:  req.GetBool("active_only", false),
+		PointInTime: req.GetString("point_in_time", ""),
+		Limit:       req.GetInt("limit", 0),
+		Offset:      req.GetInt("offset", 0),
+	}
+
+	results, err := s.tripleManager.Query(ctx, int64(projectID), opts)
+	if err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to query triples: %v", err)), nil
+	}
+
+	data, err := json.MarshalIndent(results, "", "  ")
+	if err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
+	}
+
+	return mcplib.NewToolResultText(string(data)), nil
+}
+
+func (s *Server) handleTripleStore(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	projectID, err := req.RequireInt("project_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	subject, err := req.RequireString("subject")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	predicate, err := req.RequireString("predicate")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	object, err := req.RequireString("object")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	input := memory.StoreTripleInput{
+		ProjectID:       int64(projectID),
+		Subject:         subject,
+		Predicate:       predicate,
+		Object:          object,
+		ValidFrom:       req.GetString("valid_from", ""),
+		ValidTo:         req.GetString("valid_to", ""),
+		Confidence:      req.GetFloat("confidence", 0),
+		ReplaceExisting: req.GetBool("replace_existing", false),
+	}
+
+	sourceMemoryID := req.GetInt("source_memory_id", 0)
+	if sourceMemoryID > 0 {
+		id := int64(sourceMemoryID)
+		input.SourceMemoryID = &id
+	}
+
+	triple, err := s.tripleManager.Store(ctx, input)
+	if err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to store triple: %v", err)), nil
+	}
+
+	data, err := json.MarshalIndent(triple, "", "  ")
+	if err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to marshal result: %v", err)), nil
+	}
+
+	return mcplib.NewToolResultText(fmt.Sprintf("Triple stored successfully:\n%s", string(data))), nil
+}
+
+func (s *Server) handleTripleInvalidate(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	projectID, err := req.RequireInt("project_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	tripleID, err := req.RequireInt("triple_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	validToStr := req.GetString("valid_to", "")
+	validTo := time.Now().UTC()
+	if validToStr != "" {
+		parsed, parseErr := time.Parse(time.RFC3339, validToStr)
+		if parseErr != nil {
+			return mcplib.NewToolResultError(fmt.Sprintf("Invalid valid_to format: %v", parseErr)), nil
+		}
+		validTo = parsed.UTC()
+	}
+
+	if err := s.tripleManager.Invalidate(ctx, int64(projectID), int64(tripleID), validTo); err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to invalidate triple: %v", err)), nil
+	}
+
+	return mcplib.NewToolResultText(fmt.Sprintf("Triple %d invalidated successfully (valid_to=%s)", tripleID, validTo.Format(time.RFC3339))), nil
+}
+
+func (s *Server) handleTripleDelete(ctx context.Context, req mcplib.CallToolRequest) (*mcplib.CallToolResult, error) {
+	projectID, err := req.RequireInt("project_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	tripleID, err := req.RequireInt("triple_id")
+	if err != nil {
+		return mcplib.NewToolResultError(err.Error()), nil
+	}
+
+	if err := s.tripleManager.Delete(ctx, int64(projectID), int64(tripleID)); err != nil {
+		return mcplib.NewToolResultError(fmt.Sprintf("Failed to delete triple: %v", err)), nil
+	}
+
+	return mcplib.NewToolResultText(fmt.Sprintf("Triple %d deleted successfully from project %d", tripleID, projectID)), nil
 }

@@ -82,6 +82,11 @@ func (tm *TripleManager) Query(ctx context.Context, projectID int64, opts QueryT
 	return tm.storage.QueryTriples(ctx, projectID, opts)
 }
 
+// Get retrieves a triple by project and ID.
+func (tm *TripleManager) Get(ctx context.Context, projectID int64, tripleID int64) (*Triple, error) {
+	return tm.storage.GetTriple(ctx, projectID, tripleID)
+}
+
 // Invalidate marks a triple as no longer active by setting valid_to.
 func (tm *TripleManager) Invalidate(ctx context.Context, projectID int64, tripleID int64, validTo time.Time) error {
 	return tm.storage.InvalidateTriple(ctx, projectID, tripleID, validTo.UTC())
