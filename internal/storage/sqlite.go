@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/AlexiaChen/issue-kanban-mcp/internal/memory"
 	"github.com/AlexiaChen/issue-kanban-mcp/internal/queue"
 
 	_ "modernc.org/sqlite"
@@ -105,10 +106,16 @@ func (s *SQLiteStorage) ListProjects(ctx context.Context) ([]*queue.Queue, error
 	return queues, nil
 }
 
-// DeleteProject deletes a queue and all its tasks
+// DeleteProject deletes a queue and all its tasks and memories
 func (s *SQLiteStorage) DeleteProject(ctx context.Context, id int64) error {
-	// First delete all tasks in the queue
-	_, err := s.db.ExecContext(ctx, "DELETE FROM tasks WHERE project_id = ?", id)
+	// Delete memories first (triggers handle FTS cleanup)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM memories WHERE project_id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete project memories: %w", err)
+	}
+
+	// Then delete all tasks in the queue
+	_, err = s.db.ExecContext(ctx, "DELETE FROM tasks WHERE project_id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete queue tasks: %w", err)
 	}
@@ -432,6 +439,203 @@ func (s *SQLiteStorage) PrioritizeIssue(ctx context.Context, taskID int64) (*que
 	return s.GetIssue(ctx, taskID)
 }
 
+// --- Memory Storage Implementation ---
+
+// StoreMemory persists a new memory. Returns the existing memory if a
+// duplicate (same project_id + content_hash) already exists.
+func (s *SQLiteStorage) StoreMemory(ctx context.Context, input memory.StoreMemoryInput) (*memory.Memory, error) {
+	now := time.Now().UTC()
+
+	category := input.Category
+	if category == "" {
+		category = string(memory.CategoryGeneral)
+	}
+
+	result, err := s.db.ExecContext(ctx, `
+		INSERT INTO memories (project_id, content, summary, category, tags, source, importance, content_hash, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(project_id, content_hash) DO NOTHING`,
+		input.ProjectID, input.Content, input.Summary, category,
+		input.Tags, input.Source, input.Importance, input.ContentHash,
+		now, now,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store memory: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, fmt.Errorf("failed to check rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		// Duplicate — return existing
+		var mem memory.Memory
+		err := s.db.QueryRowContext(ctx,
+			`SELECT id, project_id, content, summary, category, tags, source, importance, content_hash, created_at, updated_at
+			 FROM memories WHERE project_id = ? AND content_hash = ?`,
+			input.ProjectID, input.ContentHash,
+		).Scan(&mem.ID, &mem.ProjectID, &mem.Content, &mem.Summary,
+			&mem.Category, &mem.Tags, &mem.Source, &mem.Importance,
+			&mem.ContentHash, &mem.CreatedAt, &mem.UpdatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch existing memory: %w", err)
+		}
+		return &mem, nil
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	return s.GetMemory(ctx, id)
+}
+
+// GetMemory retrieves a memory by its ID.
+func (s *SQLiteStorage) GetMemory(ctx context.Context, id int64) (*memory.Memory, error) {
+	var mem memory.Memory
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, project_id, content, summary, category, tags, source, importance, content_hash, created_at, updated_at
+		 FROM memories WHERE id = ?`, id,
+	).Scan(&mem.ID, &mem.ProjectID, &mem.Content, &mem.Summary,
+		&mem.Category, &mem.Tags, &mem.Source, &mem.Importance,
+		&mem.ContentHash, &mem.CreatedAt, &mem.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, memory.ErrMemoryNotFound
+		}
+		return nil, fmt.Errorf("failed to get memory: %w", err)
+	}
+	return &mem, nil
+}
+
+// SearchMemories performs FTS5 full-text search scoped to a project.
+func (s *SQLiteStorage) SearchMemories(ctx context.Context, projectID int64, query string, opts memory.SearchOptions) ([]memory.MemorySearchResult, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = memory.DefaultSearchLimit
+	}
+
+	// Build query with optional category filter
+	sqlQuery := `
+		SELECT m.id, m.project_id, m.content, m.summary, m.category, m.tags,
+			   m.source, m.importance, m.content_hash, m.created_at, m.updated_at,
+			   rank
+		FROM memories_fts fts
+		JOIN memories m ON m.id = fts.rowid
+		WHERE memories_fts MATCH ?
+		  AND m.project_id = ?`
+
+	args := []interface{}{query, projectID}
+
+	if opts.Category != "" {
+		sqlQuery += ` AND m.category = ?`
+		args = append(args, opts.Category)
+	}
+
+	sqlQuery += ` ORDER BY rank LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		// FTS5 MATCH can fail on invalid syntax — return empty instead of error
+		if strings.Contains(err.Error(), "fts5") {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to search memories: %w", err)
+	}
+	defer rows.Close()
+
+	var results []memory.MemorySearchResult
+	for rows.Next() {
+		var r memory.MemorySearchResult
+		if err := rows.Scan(
+			&r.ID, &r.ProjectID, &r.Content, &r.Summary, &r.Category,
+			&r.Tags, &r.Source, &r.Importance, &r.ContentHash,
+			&r.CreatedAt, &r.UpdatedAt, &r.Rank,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan search result: %w", err)
+		}
+		results = append(results, r)
+	}
+	return results, nil
+}
+
+// ListMemories returns memories for a project ordered by created_at DESC.
+func (s *SQLiteStorage) ListMemories(ctx context.Context, projectID int64, opts memory.ListOptions) ([]*memory.Memory, error) {
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = memory.DefaultListLimit
+	}
+
+	sqlQuery := `
+		SELECT id, project_id, content, summary, category, tags, source, importance, content_hash, created_at, updated_at
+		FROM memories WHERE project_id = ?`
+	args := []interface{}{projectID}
+
+	if opts.Category != "" {
+		sqlQuery += ` AND category = ?`
+		args = append(args, opts.Category)
+	}
+
+	sqlQuery += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	args = append(args, limit, opts.Offset)
+
+	rows, err := s.db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list memories: %w", err)
+	}
+	defer rows.Close()
+
+	var mems []*memory.Memory
+	for rows.Next() {
+		var m memory.Memory
+		if err := rows.Scan(&m.ID, &m.ProjectID, &m.Content, &m.Summary,
+			&m.Category, &m.Tags, &m.Source, &m.Importance,
+			&m.ContentHash, &m.CreatedAt, &m.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("failed to scan memory: %w", err)
+		}
+		mems = append(mems, &m)
+	}
+	return mems, nil
+}
+
+// DeleteMemory removes a memory. Returns ErrMemoryNotInProject if the
+// memory does not belong to the specified project.
+func (s *SQLiteStorage) DeleteMemory(ctx context.Context, projectID int64, memoryID int64) error {
+	// Check existence and project ownership
+	var ownerProject int64
+	err := s.db.QueryRowContext(ctx,
+		`SELECT project_id FROM memories WHERE id = ?`, memoryID,
+	).Scan(&ownerProject)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return memory.ErrMemoryNotFound
+		}
+		return fmt.Errorf("failed to check memory: %w", err)
+	}
+
+	if ownerProject != projectID {
+		return memory.ErrMemoryNotInProject
+	}
+
+	_, err = s.db.ExecContext(ctx, `DELETE FROM memories WHERE id = ?`, memoryID)
+	if err != nil {
+		return fmt.Errorf("failed to delete memory: %w", err)
+	}
+	return nil
+}
+
+// DeleteMemoriesByProject removes all memories for a project.
+func (s *SQLiteStorage) DeleteMemoriesByProject(ctx context.Context, projectID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM memories WHERE project_id = ?`, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to delete project memories: %w", err)
+	}
+	return nil
+}
+
 // runMigrations runs database migrations
 func runMigrations(db *sql.DB) error {
 	_, err := db.Exec(`
@@ -461,6 +665,68 @@ func runMigrations(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_tasks_project_id ON tasks(project_id);
 		CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
 		CREATE INDEX IF NOT EXISTS idx_tasks_position ON tasks(project_id, position);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Memory system tables
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS memories (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			content TEXT NOT NULL,
+			summary TEXT DEFAULT '',
+			category TEXT NOT NULL DEFAULT 'general'
+				CHECK(category IN ('decision','fact','event','preference','advice','general')),
+			tags TEXT DEFAULT '',
+			source TEXT DEFAULT '',
+			importance INTEGER NOT NULL DEFAULT 3 CHECK(importance BETWEEN 1 AND 5),
+			content_hash TEXT NOT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES queues(id) ON DELETE CASCADE,
+			UNIQUE(project_id, content_hash)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_memories_project_id ON memories(project_id);
+		CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(project_id, category);
+		CREATE INDEX IF NOT EXISTS idx_memories_hash ON memories(project_id, content_hash);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// FTS5 virtual table for full-text search on memory content + summary
+	_, err = db.Exec(`
+		CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+			content,
+			summary,
+			tags,
+			content='memories',
+			content_rowid='id'
+		);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Triggers to keep FTS index in sync
+	_, err = db.Exec(`
+		CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+			INSERT INTO memories_fts(rowid, content, summary, tags)
+			VALUES (new.id, new.content, new.summary, new.tags);
+		END;
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(`
+		CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+			INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags)
+			VALUES ('delete', old.id, old.content, old.summary, old.tags);
+		END;
 	`)
 	if err != nil {
 		return err
