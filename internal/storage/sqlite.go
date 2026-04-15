@@ -106,10 +106,16 @@ func (s *SQLiteStorage) ListProjects(ctx context.Context) ([]*queue.Queue, error
 	return queues, nil
 }
 
-// DeleteProject deletes a queue and all its tasks and memories
+// DeleteProject deletes a queue and all its tasks, triples, and memories
 func (s *SQLiteStorage) DeleteProject(ctx context.Context, id int64) error {
-	// Delete memories first (triggers handle FTS cleanup)
-	_, err := s.db.ExecContext(ctx, "DELETE FROM memories WHERE project_id = ?", id)
+	// Delete triples first (references memories via source_memory_id FK)
+	_, err := s.db.ExecContext(ctx, "DELETE FROM memory_triples WHERE project_id = ?", id)
+	if err != nil {
+		return fmt.Errorf("failed to delete project triples: %w", err)
+	}
+
+	// Delete memories (triggers handle FTS cleanup)
+	_, err = s.db.ExecContext(ctx, "DELETE FROM memories WHERE project_id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete project memories: %w", err)
 	}
@@ -636,6 +642,236 @@ func (s *SQLiteStorage) DeleteMemoriesByProject(ctx context.Context, projectID i
 	return nil
 }
 
+// --- Triple Storage Implementation ---
+
+// StoreTriple persists a new triple. If ReplaceExisting is true,
+// active triples with the same (project_id, subject, predicate) and a different
+// object will be invalidated within the same transaction.
+func (s *SQLiteStorage) StoreTriple(ctx context.Context, input memory.StoreTripleInput) (*memory.Triple, error) {
+	now := time.Now().UTC()
+
+	validFrom := now
+	if input.ValidFrom != "" {
+		parsed, err := time.Parse(time.RFC3339, input.ValidFrom)
+		if err != nil {
+			return nil, fmt.Errorf("invalid valid_from: %w", err)
+		}
+		validFrom = parsed.UTC()
+	}
+
+	var validTo *time.Time
+	if input.ValidTo != "" {
+		parsed, err := time.Parse(time.RFC3339, input.ValidTo)
+		if err != nil {
+			return nil, fmt.Errorf("invalid valid_to: %w", err)
+		}
+		utc := parsed.UTC()
+		validTo = &utc
+	}
+
+	confidence := input.Confidence
+	if confidence == 0 {
+		confidence = 1.0
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// Auto-invalidation: if ReplaceExisting, invalidate active triples with same
+	// (project, subject, predicate) but different object
+	if input.ReplaceExisting {
+		_, err = tx.ExecContext(ctx, `
+			UPDATE memory_triples
+			SET valid_to = ?
+			WHERE project_id = ? AND subject = ? AND predicate = ?
+			  AND object != ? AND valid_to IS NULL`,
+			validFrom, input.ProjectID, input.Subject, input.Predicate, input.Object,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to invalidate existing triples: %w", err)
+		}
+	}
+
+	result, err := tx.ExecContext(ctx, `
+		INSERT INTO memory_triples (project_id, subject, predicate, object, valid_from, valid_to, confidence, source_memory_id, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		input.ProjectID, input.Subject, input.Predicate, input.Object,
+		validFrom, validTo, confidence, input.SourceMemoryID, now,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to store triple: %w", err)
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get last insert ID: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	return s.GetTriple(ctx, input.ProjectID, id)
+}
+
+// GetTriple retrieves a triple by project and ID.
+func (s *SQLiteStorage) GetTriple(ctx context.Context, projectID int64, id int64) (*memory.Triple, error) {
+	var t memory.Triple
+	var validTo sql.NullTime
+	var sourceMemoryID sql.NullInt64
+
+	err := s.db.QueryRowContext(ctx, `
+		SELECT id, project_id, subject, predicate, object, valid_from, valid_to,
+		       confidence, source_memory_id, created_at
+		FROM memory_triples WHERE id = ?`, id,
+	).Scan(&t.ID, &t.ProjectID, &t.Subject, &t.Predicate, &t.Object,
+		&t.ValidFrom, &validTo, &t.Confidence, &sourceMemoryID, &t.CreatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, memory.ErrTripleNotFound
+		}
+		return nil, fmt.Errorf("failed to get triple: %w", err)
+	}
+
+	if t.ProjectID != projectID {
+		return nil, memory.ErrTripleNotInProject
+	}
+
+	if validTo.Valid {
+		t.ValidTo = &validTo.Time
+	}
+	if sourceMemoryID.Valid {
+		v := sourceMemoryID.Int64
+		t.SourceMemoryID = &v
+	}
+
+	return &t, nil
+}
+
+// QueryTriples returns triples matching the given filters.
+func (s *SQLiteStorage) QueryTriples(ctx context.Context, projectID int64, opts memory.QueryTripleOptions) ([]*memory.Triple, error) {
+	query := `SELECT id, project_id, subject, predicate, object, valid_from, valid_to,
+	                 confidence, source_memory_id, created_at
+	          FROM memory_triples WHERE project_id = ?`
+	args := []interface{}{projectID}
+
+	if opts.Subject != "" {
+		query += " AND subject LIKE ?"
+		args = append(args, "%"+opts.Subject+"%")
+	}
+	if opts.Predicate != "" {
+		query += " AND predicate LIKE ?"
+		args = append(args, "%"+opts.Predicate+"%")
+	}
+	if opts.Object != "" {
+		query += " AND object LIKE ?"
+		args = append(args, "%"+opts.Object+"%")
+	}
+
+	if opts.PointInTime != "" {
+		pit, err := time.Parse(time.RFC3339, opts.PointInTime)
+		if err != nil {
+			return nil, fmt.Errorf("invalid point_in_time: %w", err)
+		}
+		// [valid_from, valid_to) semantics: valid_from <= pit AND (valid_to IS NULL OR valid_to > pit)
+		query += " AND valid_from <= ? AND (valid_to IS NULL OR valid_to > ?)"
+		args = append(args, pit.UTC(), pit.UTC())
+	} else if opts.ActiveOnly {
+		query += " AND valid_to IS NULL"
+	}
+
+	query += " ORDER BY valid_from DESC, id DESC"
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = memory.DefaultTripleQueryLimit
+	}
+	query += " LIMIT ?"
+	args = append(args, limit)
+
+	if opts.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, opts.Offset)
+	}
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query triples: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*memory.Triple
+	for rows.Next() {
+		var t memory.Triple
+		var validTo sql.NullTime
+		var sourceMemoryID sql.NullInt64
+
+		err := rows.Scan(&t.ID, &t.ProjectID, &t.Subject, &t.Predicate, &t.Object,
+			&t.ValidFrom, &validTo, &t.Confidence, &sourceMemoryID, &t.CreatedAt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan triple: %w", err)
+		}
+
+		if validTo.Valid {
+			t.ValidTo = &validTo.Time
+		}
+		if sourceMemoryID.Valid {
+			v := sourceMemoryID.Int64
+			t.SourceMemoryID = &v
+		}
+		results = append(results, &t)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows iteration error: %w", err)
+	}
+
+	return results, nil
+}
+
+// InvalidateTriple sets valid_to on a triple, marking it as no longer active.
+func (s *SQLiteStorage) InvalidateTriple(ctx context.Context, projectID int64, tripleID int64, validTo time.Time) error {
+	// First check the triple exists and belongs to project
+	_, err := s.GetTriple(ctx, projectID, tripleID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.ExecContext(ctx, `UPDATE memory_triples SET valid_to = ? WHERE id = ?`,
+		validTo.UTC(), tripleID)
+	if err != nil {
+		return fmt.Errorf("failed to invalidate triple: %w", err)
+	}
+	return nil
+}
+
+// DeleteTriple hard-deletes a triple.
+func (s *SQLiteStorage) DeleteTriple(ctx context.Context, projectID int64, tripleID int64) error {
+	// First check the triple exists and belongs to project
+	_, err := s.GetTriple(ctx, projectID, tripleID)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.ExecContext(ctx, `DELETE FROM memory_triples WHERE id = ?`, tripleID)
+	if err != nil {
+		return fmt.Errorf("failed to delete triple: %w", err)
+	}
+	return nil
+}
+
+// DeleteTriplesByProject removes all triples for a project.
+func (s *SQLiteStorage) DeleteTriplesByProject(ctx context.Context, projectID int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM memory_triples WHERE project_id = ?`, projectID)
+	if err != nil {
+		return fmt.Errorf("failed to delete project triples: %w", err)
+	}
+	return nil
+}
+
 // runMigrations runs database migrations
 func runMigrations(db *sql.DB) error {
 	_, err := db.Exec(`
@@ -740,6 +976,32 @@ func runMigrations(db *sql.DB) error {
 			INSERT INTO memories_fts(rowid, content, summary, tags)
 			VALUES (new.id, new.content, new.summary, new.tags);
 		END;
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Temporal knowledge graph table
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS memory_triples (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			project_id INTEGER NOT NULL,
+			subject TEXT NOT NULL,
+			predicate TEXT NOT NULL,
+			object TEXT NOT NULL,
+			valid_from DATETIME NOT NULL,
+			valid_to DATETIME,
+			confidence REAL NOT NULL DEFAULT 1.0 CHECK(confidence BETWEEN 0.0 AND 1.0),
+			source_memory_id INTEGER,
+			created_at DATETIME NOT NULL,
+			FOREIGN KEY (project_id) REFERENCES queues(id),
+			FOREIGN KEY (source_memory_id) REFERENCES memories(id)
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_triples_project ON memory_triples(project_id);
+		CREATE INDEX IF NOT EXISTS idx_triples_subject ON memory_triples(project_id, subject);
+		CREATE INDEX IF NOT EXISTS idx_triples_predicate ON memory_triples(project_id, subject, predicate);
+		CREATE INDEX IF NOT EXISTS idx_triples_active ON memory_triples(project_id, valid_to);
 	`)
 	if err != nil {
 		return err

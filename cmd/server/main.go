@@ -47,10 +47,14 @@ func main() {
 	// Initialize memory manager
 	memManager := memory.NewMemoryManager(store)
 
+	// Initialize triple manager
+	tripleManager := memory.NewTripleManager(store)
+
 	// Create MCP server
 	mcpServer, err := mcplib.NewServer(manager,
 		mcplib.WithReadonlyMode(*readonly),
 		mcplib.WithMemoryManager(memManager),
+		mcplib.WithTripleManager(tripleManager),
 	)
 	if err != nil {
 		log.Fatalf("Failed to create MCP server: %v", err)
@@ -93,6 +97,7 @@ func main() {
 	// Register REST API
 	apiHandler := api.NewHandler(manager)
 	apiHandler.SetMemoryManager(memManager)
+	apiHandler.SetTripleManager(tripleManager)
 	apiHandler.RegisterRoutes(mux)
 
 	// Serve static files

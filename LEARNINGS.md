@@ -45,3 +45,11 @@
 - **Evidence**: instructions/copilot-instructions.md — had to update opening quote, loop diagram, Step 3a, Step 5c, MCP Tools Reference, Appendix E checklist, and Final Report template
 - **Confidence**: 8/10
 - **Action**: Create a checklist of all workflow doc touchpoints before starting doc integration work
+
+### L-006: [gotcha] Memory importance CHECK constraint in tests (2026-04-15)
+- **Issue**: #38 — 开发时序知识图谱
+- **Trigger**: memory, store, test, importance, CHECK
+- **Pattern**: When creating memories as test fixtures, the `Importance` field has a CHECK constraint (1-5). Omitting it defaults to 0, which violates the constraint and causes cryptic "CHECK constraint failed" errors.
+- **Evidence**: internal/storage/sqlite_triple_test.go — StoreWithSourceMemory test initially failed with CHECK constraint violation
+- **Confidence**: 8/10
+- **Action**: Always set `Importance: 3` (or valid 1-5 value) when creating memory fixtures in tests

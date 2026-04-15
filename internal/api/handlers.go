@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/AlexiaChen/issue-kanban-mcp/internal/memory"
 	"github.com/AlexiaChen/issue-kanban-mcp/internal/queue"
@@ -13,6 +14,7 @@ import (
 type Handler struct {
 	manager       *queue.Manager
 	memoryManager *memory.MemoryManager
+	tripleManager *memory.TripleManager
 }
 
 // NewHandler creates a new API handler
@@ -23,6 +25,11 @@ func NewHandler(manager *queue.Manager) *Handler {
 // SetMemoryManager sets the memory manager for memory API endpoints
 func (h *Handler) SetMemoryManager(mm *memory.MemoryManager) {
 	h.memoryManager = mm
+}
+
+// SetTripleManager sets the triple manager for knowledge graph API endpoints
+func (h *Handler) SetTripleManager(tm *memory.TripleManager) {
+	h.tripleManager = tm
 }
 
 // RegisterRoutes registers API routes
@@ -51,6 +58,15 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		mux.HandleFunc("GET /api/projects/{id}/memories", h.ListMemories)
 		mux.HandleFunc("GET /api/projects/{id}/memories/search", h.SearchMemories)
 		mux.HandleFunc("DELETE /api/projects/{id}/memories/{mid}", h.DeleteMemory)
+	}
+
+	// Triple endpoints (only if triple manager is configured)
+	if h.tripleManager != nil {
+		mux.HandleFunc("POST /api/projects/{id}/triples", h.StoreTriple)
+		mux.HandleFunc("GET /api/projects/{id}/triples", h.QueryTriples)
+		mux.HandleFunc("GET /api/projects/{id}/triples/{tid}", h.GetTriple)
+		mux.HandleFunc("PATCH /api/projects/{id}/triples/{tid}", h.InvalidateTriple)
+		mux.HandleFunc("DELETE /api/projects/{id}/triples/{tid}", h.DeleteTriple)
 	}
 }
 
@@ -495,6 +511,179 @@ func (h *Handler) DeleteMemory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.writeJSON(w, http.StatusOK, map[string]string{"message": "memory deleted"})
+}
+
+// Triple handlers
+
+func (h *Handler) StoreTriple(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid project ID")
+		return
+	}
+
+	var input memory.StoreTripleInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	input.ProjectID = projectID
+
+	triple, err := h.tripleManager.Store(r.Context(), input)
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch err {
+		case memory.ErrEmptySubject, memory.ErrEmptyPredicate, memory.ErrEmptyObject,
+			memory.ErrSubjectTooLong, memory.ErrPredicateTooLong, memory.ErrObjectTooLong,
+			memory.ErrInvalidConfidence, memory.ErrInvalidTimeRange:
+			status = http.StatusBadRequest
+		}
+		h.writeError(w, status, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusCreated, triple)
+}
+
+func (h *Handler) GetTriple(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid project ID")
+		return
+	}
+
+	tripleID, err := strconv.ParseInt(r.PathValue("tid"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid triple ID")
+		return
+	}
+
+	triple, err := h.tripleManager.Get(r.Context(), projectID, tripleID)
+	if err != nil {
+		status := http.StatusInternalServerError
+		switch err {
+		case memory.ErrTripleNotFound:
+			status = http.StatusNotFound
+		case memory.ErrTripleNotInProject:
+			status = http.StatusForbidden
+		}
+		h.writeError(w, status, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, triple)
+}
+
+func (h *Handler) QueryTriples(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid project ID")
+		return
+	}
+
+	opts := memory.QueryTripleOptions{
+		Subject:     r.URL.Query().Get("subject"),
+		Predicate:   r.URL.Query().Get("predicate"),
+		Object:      r.URL.Query().Get("object"),
+		PointInTime: r.URL.Query().Get("point_in_time"),
+	}
+	if r.URL.Query().Get("active_only") == "true" {
+		opts.ActiveOnly = true
+	}
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if opts.Limit, err = strconv.Atoi(limitStr); err != nil {
+			h.writeError(w, http.StatusBadRequest, "invalid limit")
+			return
+		}
+	}
+	if offsetStr := r.URL.Query().Get("offset"); offsetStr != "" {
+		if opts.Offset, err = strconv.Atoi(offsetStr); err != nil {
+			h.writeError(w, http.StatusBadRequest, "invalid offset")
+			return
+		}
+	}
+
+	triples, err := h.tripleManager.Query(r.Context(), projectID, opts)
+	if err != nil {
+		h.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, triples)
+}
+
+func (h *Handler) InvalidateTriple(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid project ID")
+		return
+	}
+
+	tripleID, err := strconv.ParseInt(r.PathValue("tid"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid triple ID")
+		return
+	}
+
+	var body struct {
+		ValidTo string `json:"valid_to"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	validTo := time.Now().UTC()
+	if body.ValidTo != "" {
+		parsed, parseErr := time.Parse(time.RFC3339, body.ValidTo)
+		if parseErr != nil {
+			h.writeError(w, http.StatusBadRequest, "invalid valid_to format (use RFC3339)")
+			return
+		}
+		validTo = parsed.UTC()
+	}
+
+	if err := h.tripleManager.Invalidate(r.Context(), projectID, tripleID, validTo); err != nil {
+		status := http.StatusInternalServerError
+		switch err {
+		case memory.ErrTripleNotFound:
+			status = http.StatusNotFound
+		case memory.ErrTripleNotInProject:
+			status = http.StatusForbidden
+		}
+		h.writeError(w, status, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]string{"message": "triple invalidated"})
+}
+
+func (h *Handler) DeleteTriple(w http.ResponseWriter, r *http.Request) {
+	projectID, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid project ID")
+		return
+	}
+
+	tripleID, err := strconv.ParseInt(r.PathValue("tid"), 10, 64)
+	if err != nil {
+		h.writeError(w, http.StatusBadRequest, "invalid triple ID")
+		return
+	}
+
+	if err := h.tripleManager.Delete(r.Context(), projectID, tripleID); err != nil {
+		status := http.StatusInternalServerError
+		switch err {
+		case memory.ErrTripleNotFound:
+			status = http.StatusNotFound
+		case memory.ErrTripleNotInProject:
+			status = http.StatusForbidden
+		}
+		h.writeError(w, status, err.Error())
+		return
+	}
+
+	h.writeJSON(w, http.StatusOK, map[string]string{"message": "triple deleted"})
 }
 
 // Helper functions
