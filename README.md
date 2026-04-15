@@ -15,7 +15,8 @@ miss the same edge cases, and forget the same gotchas — every single time.
 
 This project fixes that. It combines a multi-interface kanban board (Web UI, TUI, CLI)
 with an [MCP](https://modelcontextprotocol.io/) server that AI agents connect to,
-a **persistent memory system** (FTS5 full-text search with BM25 ranking), and an
+a **persistent memory system** (FTS5 full-text search with BM25 ranking), a
+**temporal knowledge graph** (subject-predicate-object triples with time-range validity), and an
 operational playbook that implements **harness engineering**: structured quality
 gates, human-in-the-loop checkpoints, and a compound learning system that
 accumulates project knowledge across issues.
@@ -106,7 +107,7 @@ issues without leaving the command line.
 
 ### MCP (for AI Agents)
 
-The server exposes 12 MCP tools (8 kanban + 4 memory) and 4 MCP resources via STDIO or HTTP/SSE transport.
+The server exposes 16 MCP tools (8 kanban + 4 memory + 4 triple) and 4 MCP resources via STDIO or HTTP/SSE transport.
 AI agents connect and process issues autonomously.
 
 ---
@@ -180,10 +181,29 @@ SQLite FTS5 with BM25 ranking. This provides a different kind of knowledge:
 The memory system supports 6 categories: `decision`, `fact`, `event`, `preference`,
 `advice`, `general` — each with importance scoring (1-10) for prioritized retrieval.
 
+### 5. Temporal Knowledge Graph (Triples)
+
+The agent can store and query **subject-predicate-object triples** with temporal semantics:
+
+```
+(auth-module, depends_on, jwt-library)  valid: 2024-01-01 → ∞ (active)
+(auth-module, status, "needs-refactor")  valid: 2024-03-15 → 2024-04-01 (superseded)
+(auth-module, status, "refactored")      valid: 2024-04-01 → ∞ (active)
+```
+
+- **Temporal queries**: "What was the status on March 20?" → point-in-time lookup
+- **Auto-invalidation**: When storing with `replace_existing=true`, the old triple's
+  `valid_to` is set to the new triple's `valid_from` (transactional)
+- **`[valid_from, valid_to)` semantics**: Closed-open intervals prevent double-matching
+
+This gives the agent a structured, queryable model of how the project has evolved —
+not just what's true now, but what was true when.
+
 ### Four Tiers of Knowledge
 
 | Tier | File | Scope | How it grows |
 |------|------|-------|-------------|
+| Knowledge graph | SQLite DB (via MCP) | Per-project | Agent stores temporal triples (entity relationships) |
 | Persistent memory | SQLite DB (via MCP) | Per-project | Agent stores context after each issue |
 | Working memory | `LEARNINGS.md` | Per-project | Agent captures mistake-driven patterns |
 | Project conventions | `AGENTS.md` | Per-project | Promoted from LEARNINGS.md (≥3 matches) |
@@ -229,11 +249,11 @@ The server binary is statically compiled (`CGO_ENABLED=0`) with no dynamic depen
 
 ### Readonly Mode (Default)
 
-By default, the MCP server exposes only **5 safe tools**: `project_list`, `issue_list`,
-`issue_update`, `memory_search`, `memory_list`. This means AI agents can read issues,
-update status, and search memories, but cannot create or delete anything.
+By default, the MCP server exposes only **6 safe tools**: `project_list`, `issue_list`,
+`issue_update`, `memory_search`, `memory_list`, `triple_query`. This means AI agents can read issues,
+update status, search memories, and query the knowledge graph, but cannot create or delete anything.
 
-To expose all 12 tools (including create/delete for issues and memories):
+To expose all 16 tools (including create/delete for issues, memories, and triples):
 
 ```bash
 ./bin/issue-kanban-mcp -readonly=false
@@ -328,6 +348,15 @@ Then tell your AI agent: *"Process all issues in project X"* — it handles the 
 | `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` | admin |
 | `memory_delete` | `project_id`, `memory_id` | admin |
 
+### Triple Tools (Temporal Knowledge Graph)
+
+| Tool | Parameters | Mode |
+|------|-----------|------|
+| `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` | readonly |
+| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` | admin |
+| `triple_invalidate` | `project_id`, `triple_id` | admin |
+| `triple_delete` | `project_id`, `triple_id` | admin |
+
 ## MCP Resources
 
 | URI | Description |
@@ -372,6 +401,16 @@ Then tell your AI agent: *"Process all issues in project X"* — it handles the 
 | GET | `/api/projects/{id}/memories/search` | Search memories (`q`, `category?`, `limit?`) |
 | DELETE | `/api/projects/{id}/memories/{mid}` | Delete memory |
 
+### Triples (Temporal Knowledge Graph)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/projects/{id}/triples` | Store triple (`replace_existing?` for auto-invalidation) |
+| GET | `/api/projects/{id}/triples/{tid}` | Get triple |
+| GET | `/api/projects/{id}/triples` | Query triples (`subject?`, `predicate?`, `active_only?`, `at_time?`) |
+| PATCH | `/api/projects/{id}/triples/{tid}` | Invalidate triple |
+| DELETE | `/api/projects/{id}/triples/{tid}` | Delete triple |
+
 ---
 
 ## Configuration
@@ -393,22 +432,26 @@ cmd/
 ├── tui/main.go              # Terminal UI
 └── cli/main.go              # Command-line interface
 internal/
-├── api/handlers.go          # REST API (18 endpoints)
+├── api/handlers.go          # REST API (23 endpoints)
 ├── apiclient/client.go      # Shared REST client (TUI & CLI)
 ├── mcp/
 │   ├── server.go            # MCP server setup
-│   ├── tools.go             # 12 MCP tools (8 kanban + 4 memory)
+│   ├── tools.go             # 16 MCP tools (8 kanban + 4 memory + 4 triple)
 │   └── resources.go         # 4 MCP resources
 ├── memory/
 │   ├── models.go            # Memory data model, categories, DTOs
 │   ├── storage.go           # Storage interface (6 methods)
 │   ├── manager.go           # Business logic (validation, dedup, BM25 search)
-│   └── mock_storage.go      # Mock for unit tests
+│   ├── mock_storage.go      # Mock for unit tests
+│   ├── triple_models.go     # Triple (KG) data model, temporal semantics
+│   ├── triple_storage.go    # TripleStorage interface (6 methods)
+│   ├── triple_manager.go    # Triple business logic (validation, temporal)
+│   └── mock_triple_storage.go # Mock for triple unit tests
 ├── queue/
 │   ├── manager.go           # Kanban business logic layer
 │   ├── models.go            # Project/Issue data models
 │   └── mock_storage.go      # Mock storage for tests
-├── storage/sqlite.go        # SQLite (pure Go, no CGO) — implements both queue + memory storage
+├── storage/sqlite.go        # SQLite (pure Go, no CGO) — implements queue + memory + triple storage
 ├── tui/                     # Bubbletea TUI
 └── web/static/              # Embedded SPA
 instructions/

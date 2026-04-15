@@ -26,13 +26,17 @@ internal/
 ├── apiclient/client.go  # Shared REST client (used by TUI & CLI)
 ├── mcp/
 │   ├── server.go        # MCP server setup & routing
-│   ├── tools.go         # 12 MCP tools (5 readonly + 7 admin)
+│   ├── tools.go         # 16 MCP tools (6 readonly + 10 admin)
 │   └── resources.go     # 4 MCP resources
 ├── memory/
-│   ├── models.go        # Memory data model, categories, DTOs, errors
-│   ├── storage.go       # memory.Storage interface (6 methods)
-│   ├── manager.go       # MemoryManager: validation, dedup, normalization
-│   └── mock_storage.go  # In-memory mock for unit tests
+│   ├── models.go              # Memory data model, categories, DTOs, errors
+│   ├── storage.go             # memory.Storage interface (6 methods)
+│   ├── manager.go             # MemoryManager: validation, dedup, normalization
+│   ├── mock_storage.go        # In-memory mock for unit tests
+│   ├── triple_models.go       # Triple (KG) data model, temporal semantics
+│   ├── triple_storage.go      # TripleStorage interface (6 methods)
+│   ├── triple_manager.go      # TripleManager: validation, temporal logic
+│   └── mock_triple_storage.go # In-memory mock for triple unit tests
 ├── queue/
 │   ├── manager.go       # Business logic layer (always use this, not storage directly)
 │   ├── models.go        # Data models: Project, Issue, Priority, Status
@@ -91,6 +95,29 @@ type Memory struct {
 }
 ```
 
+### Temporal Knowledge Graph (Triples)
+
+```go
+// Temporal triple with [valid_from, valid_to) closed-open interval semantics
+
+type Triple struct {
+    ID             int64
+    ProjectID      int
+    Subject        string     // entity (e.g., "auth-module")
+    Predicate      string     // relationship (e.g., "depends_on")
+    Object         string     // target (e.g., "jwt-library")
+    ValidFrom      time.Time  // when this fact became true
+    ValidTo        *time.Time // nil = currently active; set = invalidated/replaced
+    Confidence     float64    // 0.0-1.0 (default 1.0)
+    SourceMemoryID *int64     // optional link to originating memory
+    CreatedAt      time.Time
+}
+
+// StoreTripleInput.ReplaceExisting controls auto-invalidation:
+//   true  → single-valued predicates (status, assigned_to): old triple gets valid_to = new.valid_from
+//   false → multi-valued predicates (has_label, depends_on): both triples coexist
+```
+
 ---
 
 ## Build & Run
@@ -141,6 +168,15 @@ make e2e-quick    # e2e against already-running server
 | GET | `/api/projects/{id}/memories/search` | Search memories (`q`, `category?`, `limit?`) |
 | DELETE | `/api/projects/{id}/memories/{mid}` | Delete memory |
 
+### Triples (Temporal Knowledge Graph)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/projects/{id}/triples` | Store triple (auto-invalidate with `replace_existing`) |
+| GET | `/api/projects/{id}/triples/{tid}` | Get triple by ID |
+| GET | `/api/projects/{id}/triples` | Query triples (`subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?`) |
+| PATCH | `/api/projects/{id}/triples/{tid}` | Invalidate triple (set `valid_to`) |
+| DELETE | `/api/projects/{id}/triples/{tid}` | Delete triple |
+
 ---
 
 ## MCP Tools
@@ -153,9 +189,10 @@ make e2e-quick    # e2e against already-running server
 | `issue_update` | `task_id`, `status` |
 | `memory_search` | `project_id`, `query`, `category?`, `limit?` |
 | `memory_list` | `project_id`, `category?`, `limit?`, `offset?` |
+| `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` |
 
 ### Admin (require `-readonly=false`)
-`project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`, `memory_store`, `memory_delete`
+`project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`, `memory_store`, `memory_delete`, `triple_store`, `triple_invalidate`, `triple_delete`
 
 ---
 
@@ -179,8 +216,8 @@ make e2e-quick    # e2e against already-running server
 
 ## Code Conventions
 
-- **Business logic**: always go through `queue.Manager` / `memory.MemoryManager`, never call `storage` directly
-- **Testing**: use `queue.NewMockStorage()` / `memory.NewMockMemoryStorage()` — tests must not require a real DB or server
+- **Business logic**: always go through `queue.Manager` / `memory.MemoryManager` / `memory.TripleManager`, never call `storage` directly
+- **Testing**: use `queue.NewMockStorage()` / `memory.NewMockMemoryStorage()` / `memory.NewMockTripleStorage()` — tests must not require a real DB or server
 - **TDD discipline**: RED-GREEN-REFACTOR for all new code. Write failing test first, implement minimal code to pass, refactor. No production code without a failing test. See Step 4b in the playbook.
 - **Systematic debugging**: For any bug fix, follow the 4-phase root cause protocol (Step 4d) before attempting fixes. No random fix-and-check cycles.
 - **Verification before completion**: Run `make test` and verify output BEFORE claiming tests pass. Evidence before claims, always.
