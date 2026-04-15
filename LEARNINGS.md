@@ -37,3 +37,11 @@
 - **Evidence**: internal/storage/sqlite_memory_test.go:264 (epsilon comparison), initial test used `==` and silently skipped the check
 - **Confidence**: 9/10
 - **Action**: Always use epsilon-based comparison (e.g., `math.Abs(a-b) < 1e-6`) when comparing FTS5 rank values in tests.
+
+### L-005: [convention] Update all workflow touchpoints when integrating a new subsystem (2026-04-15)
+- **Issue**: #37 — 更新项目
+- **Trigger**: workflow, integration, documentation, update, subsystem, loop
+- **Pattern**: When integrating a new subsystem into workflow documentation, there are 5+ touchpoints to update (loop diagram, step descriptions, tool reference, compliance checklist, final report template). Missing any one causes confusion.
+- **Evidence**: instructions/copilot-instructions.md — had to update opening quote, loop diagram, Step 3a, Step 5c, MCP Tools Reference, Appendix E checklist, and Final Report template
+- **Confidence**: 8/10
+- **Action**: Create a checklist of all workflow doc touchpoints before starting doc integration work
