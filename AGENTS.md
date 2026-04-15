@@ -26,7 +26,7 @@ internal/
 ├── apiclient/client.go  # Shared REST client (used by TUI & CLI)
 ├── mcp/
 │   ├── server.go        # MCP server setup & routing
-│   ├── tools.go         # 16 MCP tools (6 readonly + 10 admin)
+│   ├── tools.go         # 16 MCP tools (8 readonly + 8 admin)
 │   └── resources.go     # 4 MCP resources
 ├── memory/
 │   ├── models.go              # Memory data model, categories, DTOs, errors
@@ -189,10 +189,12 @@ make e2e-quick    # e2e against already-running server
 | `issue_update` | `task_id`, `status` |
 | `memory_search` | `project_id`, `query`, `category?`, `limit?` |
 | `memory_list` | `project_id`, `category?`, `limit?`, `offset?` |
+| `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` |
 | `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` |
+| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` |
 
 ### Admin (require `-readonly=false`)
-`project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`, `memory_store`, `memory_delete`, `triple_store`, `triple_invalidate`, `triple_delete`
+`project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`, `memory_delete`, `triple_invalidate`, `triple_delete`
 
 ---
 

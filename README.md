@@ -345,7 +345,7 @@ Then tell your AI agent: *"Process all issues in project X"* — it handles the 
 |------|-----------|------|
 | `memory_search` | `project_id`, `query`, `category?`, `limit?` | readonly |
 | `memory_list` | `project_id`, `category?`, `limit?` | readonly |
-| `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` | admin |
+| `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` | readonly |
 | `memory_delete` | `project_id`, `memory_id` | admin |
 
 ### Triple Tools (Temporal Knowledge Graph)
@@ -353,7 +353,7 @@ Then tell your AI agent: *"Process all issues in project X"* — it handles the 
 | Tool | Parameters | Mode |
 |------|-----------|------|
 | `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` | readonly |
-| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` | admin |
+| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` | readonly |
 | `triple_invalidate` | `project_id`, `triple_id` | admin |
 | `triple_delete` | `project_id`, `triple_id` | admin |
 

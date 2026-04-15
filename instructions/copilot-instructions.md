@@ -94,7 +94,8 @@ cp instructions/copilot-instructions.md ~/.copilot/copilot-instructions.md
    │         [5c. Compound]
    │            5c-i.  Capture learnings → append to LEARNINGS.md
    │            5c-ii. Store memories → memory_store (decisions, facts, preferences)
-   │            5c-iii. Knowledge Alignment → update AGENTS.md + project docs
+   │            5c-iii. Store triples → triple_store (entity relationships, state changes)
+   │            5c-iv. Knowledge Alignment → update AGENTS.md + project docs
    │            │
    │            └──► MANDATORY: go back to [2] (DO NOT stop here)
    │
@@ -162,8 +163,9 @@ discover the empty queue, and proceed to Step 6 where `ask_user` is called.
 
 ### 3a. Load Knowledge
 
-> Two complementary knowledge sources: LEARNINGS.md for mistake-driven patterns,
-> Memory system for rich contextual knowledge. Load both before starting work.
+> Three complementary knowledge sources: LEARNINGS.md for mistake-driven patterns,
+> Memory system for rich contextual knowledge, Knowledge Graph for entity relationships.
+> Load all before starting work.
 
 **Part 1 — LEARNINGS.md (mistake avoidance):**
 
@@ -197,6 +199,24 @@ If the MCP memory tools are available (`memory_search`):
 
 > Memory search is additive — it enriches context but never blocks progress.
 > If the MCP server doesn't have memory tools, skip silently.
+
+**Part 3 — Knowledge graph query (entity & relationship context):**
+
+If the MCP triple tools are available (`triple_query`):
+1. Extract key entities from issue `title + description` (component names, features, files)
+2. Call `triple_query(project_id, subject=<entity>, active_only=true)` for each entity
+3. If results found, show entity context alongside other knowledge:
+   ```
+   🔗 Knowledge graph context for Issue #<id>:
+     memory_system → uses → FTS5_BM25 (confidence: 1.0, since 2025-01-15)
+     memory_system → status → implemented (confidence: 1.0, since 2025-01-15)
+     triple_store → depends_on → memory_system (confidence: 0.9, since 2025-01-20)
+   ```
+4. Factor active relationships into execution plan (especially dependencies and status)
+5. No results or no triple tools available → proceed normally
+
+> Knowledge graph provides structural context — who depends on what, current states,
+> historical changes. Combined with memories, it gives the agent a rich project model.
 
 ### 3b. Clarity Check
 
@@ -606,7 +626,34 @@ persisting in the memory system. Use `memory_store` for:
 > Memory storage is silent — no `ask_user` needed. The agent stores what's useful,
 > and memories are retrievable via BM25 search in future pre-flight (Step 3a).
 
-#### 5c-iii. Knowledge Alignment → AGENTS.md + Project Docs
+#### 5c-iii. Store Knowledge Graph Triples → triple_store
+
+> Memories capture unstructured knowledge. Triples capture structured relationships
+> between entities — enabling the agent to reason about dependencies, states, and history.
+
+After storing memories, evaluate whether the issue produced entity relationships worth
+persisting in the knowledge graph. Use `triple_store` for:
+
+| Pattern | Subject | Predicate | Object | replace_existing? |
+|---------|---------|-----------|--------|-------------------|
+| Status change | `feature_name` | `status` | `implemented` | `true` |
+| Dependency | `component_A` | `depends_on` | `component_B` | `false` |
+| Technology choice | `module` | `uses` | `technology` | `true` |
+| Assignment | `issue_NNN` | `assigned_to` | `agent` | `true` |
+| Composition | `system` | `has_component` | `module` | `false` |
+
+**Protocol:**
+1. Review the issue's work for entity relationships (new components, dependencies, tech choices)
+2. If candidates exist, store them via `triple_store(project_id, subject, predicate, object, confidence)`
+3. Use `replace_existing=true` for single-valued predicates (status, assigned_to, uses)
+4. Use `replace_existing=false` for multi-valued predicates (depends_on, has_component, has_label)
+5. Set confidence based on certainty: 1.0 = definite fact, 0.7-0.9 = high confidence, < 0.7 = tentative
+6. No candidates → skip silently. Not every issue produces triples.
+
+> Triple storage is silent — no `ask_user` needed. The agent stores what's useful,
+> and triples are queryable via `triple_query` in future pre-flight (Step 3a Part 3).
+
+#### 5c-iv. Knowledge Alignment → AGENTS.md + Project Docs
 
 > **Why**: Design docs, implementation plans, and project knowledge bases (AGENTS.md)
 > diverge from actual code after every implementation. If not corrected immediately,
@@ -778,10 +825,13 @@ ask_user(
 | `issue_update` | `task_id`, `status` |
 | `memory_search` | `project_id`, `query`, `category?`, `limit?` |
 | `memory_list` | `project_id`, `category?`, `limit?` |
+| `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` |
+| `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` |
+| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` |
 
 **Admin** (`-readonly=false`):
 `project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`,
-`memory_store`, `memory_delete`
+`memory_delete`, `triple_invalidate`, `triple_delete`
 
 ---
 
@@ -1034,7 +1084,8 @@ The agent MUST call `ask_user` (the tool, not a text question) at these points:
 | 5b | Review complete | "Mark finished" vs "Improvements needed" |
 | 5c-i | Learnings captured | "Save" / "Edit" / "Skip" |
 | 5c-ii | Memories stored | No ask_user needed; agent stores silently |
-| 5c-iii | Docs aligned (if code changed) | No ask_user needed; auto-check + commit |
+| 5c-iii | Triples stored | No ask_user needed; agent stores silently |
+| 5c-iv | Docs aligned (if code changed) | No ask_user needed; auto-check + commit |
 | 6 | Queue empty | "Re-check" / "Switch project" / "Final report" |
 | 7 | Session ending | "Done" / "Continue" / "Add notes" |
 
