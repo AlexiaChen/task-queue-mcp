@@ -441,3 +441,71 @@ func TestIsValidCategory(t *testing.T) {
 		}
 	}
 }
+
+func TestMemoryManager_GlobalProject(t *testing.T) {
+ctx := context.Background()
+store := NewMockMemoryStorage()
+mgr := NewMemoryManager(store)
+
+const globalProjectID = int64(0)
+
+// Seed: one global memory, one project-local memory
+globalMem, err := mgr.Store(ctx, StoreMemoryInput{
+ProjectID: globalProjectID,
+Content:   "Global cross-project fact about the deployment pipeline.",
+Category:  "fact",
+})
+if err != nil {
+t.Fatalf("expected no error storing global memory, got: %v", err)
+}
+if globalMem.ProjectID != globalProjectID {
+t.Errorf("expected project_id 0, got %d", globalMem.ProjectID)
+}
+
+_, err = mgr.Store(ctx, StoreMemoryInput{
+ProjectID: 1,
+Content:   "Project-specific note about deployment.",
+Category:  "fact",
+})
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+
+t.Run("search global project returns only global memories", func(t *testing.T) {
+results, err := mgr.Search(ctx, globalProjectID, "deployment", SearchOptions{})
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if len(results) != 1 {
+t.Fatalf("expected 1 global result, got %d", len(results))
+}
+if results[0].ProjectID != globalProjectID {
+t.Errorf("expected project_id 0, got %d", results[0].ProjectID)
+}
+})
+
+t.Run("list global project returns only global memories", func(t *testing.T) {
+memories, err := mgr.List(ctx, globalProjectID, ListOptions{})
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if len(memories) != 1 {
+t.Fatalf("expected 1 global memory, got %d", len(memories))
+}
+if memories[0].ProjectID != globalProjectID {
+t.Errorf("expected project_id 0, got %d", memories[0].ProjectID)
+}
+})
+
+t.Run("project-local search does not return global memories", func(t *testing.T) {
+results, err := mgr.Search(ctx, 1, "deployment", SearchOptions{})
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+for _, r := range results {
+if r.ProjectID == globalProjectID {
+t.Error("project-local search must not return global memories (project_id=0)")
+}
+}
+})
+}

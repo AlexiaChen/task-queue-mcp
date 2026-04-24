@@ -158,6 +158,10 @@ func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
 			h.writeError(w, http.StatusNotFound, "Project not found")
 			return
 		}
+		if err == queue.ErrCannotDeleteGlobalProject {
+			h.writeError(w, http.StatusForbidden, err.Error())
+			return
+		}
 		h.writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}

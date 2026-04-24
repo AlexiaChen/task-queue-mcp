@@ -304,3 +304,17 @@ func TestAPI_FinishTask(t *testing.T) {
 		t.Errorf("Expected status 'finished', got %v", result["status"])
 	}
 }
+
+func TestAPI_DeleteGlobalProject_Forbidden(t *testing.T) {
+handler, _, _ := setupTestAPI(t)
+
+req := httptest.NewRequest(http.MethodDelete, "/api/projects/0", nil)
+req.SetPathValue("id", "0")
+rec := httptest.NewRecorder()
+
+handler.DeleteProject(rec, req)
+
+if rec.Code != http.StatusForbidden {
+t.Errorf("expected status 403 when deleting global project, got %d: %s", rec.Code, rec.Body.String())
+}
+}

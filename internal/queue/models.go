@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+// GlobalProjectID is the reserved project ID for cross-project (global) memories and triples.
+// It is a sentinel value — no row with this ID exists in the queues table.
+const GlobalProjectID int64 = 0
+
 // Priority represents the priority level of a task.
 type Priority int
 

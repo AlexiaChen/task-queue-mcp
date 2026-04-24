@@ -185,17 +185,18 @@ If `LEARNINGS.md` exists in the project root:
 
 If the MCP memory tools are available (`memory_search`):
 1. Extract 2-4 key terms from issue `title + description`
-2. Call `memory_search(project_id, query=<key terms>)` to find relevant memories
-3. If results found, show them alongside learnings:
+2. Call `memory_search(project_id, query=<key terms>)` for project-local memories
+3. **Also call `memory_search(0, query=<key terms>)` for global (cross-project) memories** — `project_id=0` is the reserved global scope
+4. Merge results; prefix global memories with 🌐:
    ```
    🧠 Relevant memories for Issue #<id>:
      [decision] "Chose FTS5 over vector search due to CGO_ENABLED=0 constraint"
        (importance: 5, from issue #35)
-     [fact] "DeleteProject cascades manually: memories → tasks → queues"
-       (importance: 4, from issue #35)
+     🌐 [fact] "All Go binaries in this workspace must use CGO_ENABLED=0"
+       (importance: 5, global)
    ```
-4. Factor high-importance memories (≥4) into execution plan
-5. No results or no memory tools available → proceed normally
+5. Factor high-importance memories (≥4) into execution plan
+6. No results or no memory tools available → proceed normally
 
 > Memory search is additive — it enriches context but never blocks progress.
 > If the MCP server doesn't have memory tools, skip silently.
@@ -204,16 +205,18 @@ If the MCP memory tools are available (`memory_search`):
 
 If the MCP triple tools are available (`triple_query`):
 1. Extract key entities from issue `title + description` (component names, features, files)
-2. Call `triple_query(project_id, subject=<entity>, active_only=true)` for each entity
-3. If results found, show entity context alongside other knowledge:
+2. Call `triple_query(project_id, subject=<entity>, active_only=true)` for project-local triples
+3. **Also call `triple_query(0, subject=<entity>, active_only=true)` for global triples** — `project_id=0` is the reserved global scope
+4. Merge results; prefix global triples with 🌐:
    ```
    🔗 Knowledge graph context for Issue #<id>:
      memory_system → uses → FTS5_BM25 (confidence: 1.0, since 2025-01-15)
      memory_system → status → implemented (confidence: 1.0, since 2025-01-15)
      triple_store → depends_on → memory_system (confidence: 0.9, since 2025-01-20)
+     🌐 workspace → requires → CGO_ENABLED=0 (confidence: 1.0, global)
    ```
-4. Factor active relationships into execution plan (especially dependencies and status)
-5. No results or no triple tools available → proceed normally
+5. Factor active relationships into execution plan (especially dependencies and status)
+6. No results or no triple tools available → proceed normally
 
 > Knowledge graph provides structural context — who depends on what, current states,
 > historical changes. Combined with memories, it gives the agent a rich project model.
@@ -619,12 +622,17 @@ persisting in the memory system. Use `memory_store` for:
 
 **Protocol:**
 1. Review the issue's work for memory-worthy context (not already in LEARNINGS.md)
-2. If candidates exist, store them via `memory_store(project_id, content, category, importance)`
-3. Set importance based on reuse likelihood: 5 = architectural, 3-4 = useful context, 1-2 = minor
-4. No candidates → skip silently. Not every issue produces memories.
+2. If candidates exist, decide scope:
+   - **Project-local** (`project_id`): insight is specific to this project
+   - **Global** (`project_id=0`): insight applies to ALL projects in this workspace — shared infrastructure, deployment pipeline, team conventions, cross-cutting tooling constraints
+3. Store via `memory_store(project_id, content, category, importance)` or `memory_store(0, content, category, importance)` for global
+4. Set importance based on reuse likelihood: 5 = architectural, 3-4 = useful context, 1-2 = minor
+5. No candidates → skip silently. Not every issue produces memories.
 
 > Memory storage is silent — no `ask_user` needed. The agent stores what's useful,
 > and memories are retrievable via BM25 search in future pre-flight (Step 3a).
+> Global memories (project_id=0) are retrieved in EVERY project's pre-flight — use sparingly
+> for truly workspace-wide facts. Avoid storing project-specific knowledge as global.
 
 #### 5c-iii. Store Knowledge Graph Triples → triple_store
 
@@ -644,14 +652,19 @@ persisting in the knowledge graph. Use `triple_store` for:
 
 **Protocol:**
 1. Review the issue's work for entity relationships (new components, dependencies, tech choices)
-2. If candidates exist, store them via `triple_store(project_id, subject, predicate, object, confidence)`
-3. Use `replace_existing=true` for single-valued predicates (status, assigned_to, uses)
-4. Use `replace_existing=false` for multi-valued predicates (depends_on, has_component, has_label)
-5. Set confidence based on certainty: 1.0 = definite fact, 0.7-0.9 = high confidence, < 0.7 = tentative
-6. No candidates → skip silently. Not every issue produces triples.
+2. If candidates exist, decide scope:
+   - **Project-local** (`project_id`): relationship is specific to this project
+   - **Global** (`project_id=0`): relationship spans all projects (e.g., `workspace → requires → CGO_ENABLED=0`)
+3. Store via `triple_store(project_id, subject, predicate, object, confidence)` or use `0` for global scope
+4. Use `replace_existing=true` for single-valued predicates (status, assigned_to, uses)
+5. Use `replace_existing=false` for multi-valued predicates (depends_on, has_component, has_label)
+6. Set confidence based on certainty: 1.0 = definite fact, 0.7-0.9 = high confidence, < 0.7 = tentative
+7. No candidates → skip silently. Not every issue produces triples.
 
 > Triple storage is silent — no `ask_user` needed. The agent stores what's useful,
 > and triples are queryable via `triple_query` in future pre-flight (Step 3a Part 3).
+> Global triples (project_id=0) are visible in EVERY project's pre-flight — use for
+> workspace-wide entity facts, not project-specific ones.
 
 #### 5c-iv. Knowledge Alignment → AGENTS.md + Project Docs
 
@@ -823,11 +836,11 @@ ask_user(
 | `project_list` | — |
 | `issue_list` | `project_id`, `status?` |
 | `issue_update` | `task_id`, `status` |
-| `memory_search` | `project_id`, `query`, `category?`, `limit?` |
-| `memory_list` | `project_id`, `category?`, `limit?` |
-| `memory_store` | `project_id`, `content`, `category?`, `summary?`, `tags?`, `importance?` |
-| `triple_query` | `project_id`, `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` |
-| `triple_store` | `project_id`, `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` |
+| `memory_search` | `project_id` (0=global), `query`, `category?`, `limit?` |
+| `memory_list` | `project_id` (0=global), `category?`, `limit?` |
+| `memory_store` | `project_id` (0=global), `content`, `category?`, `summary?`, `tags?`, `importance?` |
+| `triple_query` | `project_id` (0=global), `subject?`, `predicate?`, `active_only?`, `at_time?`, `limit?`, `offset?` |
+| `triple_store` | `project_id` (0=global), `subject`, `predicate`, `object`, `valid_from?`, `confidence?`, `source_memory_id?`, `replace_existing?` |
 
 **Admin** (`-readonly=false`):
 `project_create`, `project_delete`, `issue_create`, `issue_delete`, `issue_prioritize`,

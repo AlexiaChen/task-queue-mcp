@@ -7,10 +7,11 @@ import (
 )
 
 var (
-	ErrQueueNotFound        = errors.New("queue not found")
-	ErrTaskNotFound         = errors.New("task not found")
-	ErrInvalidStatus        = errors.New("invalid task status")
-	ErrCannotEditNonPending = errors.New("task can only be edited when pending")
+	ErrQueueNotFound              = errors.New("queue not found")
+	ErrTaskNotFound               = errors.New("task not found")
+	ErrInvalidStatus              = errors.New("invalid task status")
+	ErrCannotEditNonPending       = errors.New("task can only be edited when pending")
+	ErrCannotDeleteGlobalProject  = errors.New("cannot delete global project (project_id=0 is reserved)")
 )
 
 // Storage defines the interface for queue persistence
@@ -62,6 +63,9 @@ func (m *Manager) ListProjects(ctx context.Context) ([]*Queue, error) {
 
 // DeleteProject deletes a queue and all its tasks
 func (m *Manager) DeleteProject(ctx context.Context, id int64) error {
+	if id == GlobalProjectID {
+		return ErrCannotDeleteGlobalProject
+	}
 	return m.storage.DeleteProject(ctx, id)
 }
 

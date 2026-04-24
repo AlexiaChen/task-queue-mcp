@@ -79,6 +79,18 @@ func TestManager_TaskStatusTransitions(t *testing.T) {
 	}
 }
 
+func TestManager_DeleteGlobalProject_Forbidden(t *testing.T) {
+	m := NewManager(NewMockStorage())
+
+	err := m.DeleteProject(context.Background(), GlobalProjectID)
+	if err == nil {
+		t.Fatal("expected error when deleting global project (project_id=0)")
+	}
+	if err != ErrCannotDeleteGlobalProject {
+		t.Errorf("expected ErrCannotDeleteGlobalProject, got: %v", err)
+	}
+}
+
 func TestManager_InvalidStatus(t *testing.T) {
 	m := NewManager(NewMockStorage())
 
