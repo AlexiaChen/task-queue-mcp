@@ -63,3 +63,13 @@
 - **Evidence**: Issue #39 required updating all 5 files simultaneously
 - **Confidence**: 9/10
 - **Action**: When changing a tool's readonly/admin status, check ALL doc files referencing tool categorization
+
+---
+
+### L-008: [gotcha] instructions 文件 memory importance 量级须与服务器约束对齐 (2026-04-24)
+- **Issue**: #58 — 修正下instructions.md文件
+- **Trigger**: instructions, memory_store, importance, scale, 1-5
+- **Pattern**: copilot-instructions.md 中 importance 量级示例若超出服务器 CHECK 约束（1-5），AI 每次调用 memory_store 都会出错并重试，浪费上下文。原写 8-10/5-7/1-4（1-10 scale），而服务器实际限制 1-5。
+- **Evidence**: instructions/copilot-instructions.md:623 — 修正为 5=architectural, 3-4=useful, 1-2=minor
+- **Confidence**: 9/10
+- **Action**: 修改指令文件中 memory_store 相关示例/说明时，始终确认 importance 值在服务器约束范围 1-5 内
